@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-06-08T18:49:22.073Z",
+  "files": [
+    "services/api/src/cloud-function.js",
+    "services/api/src/cloud.js",
+    "services/api/src/core.js",
+    "apps/weapp/utils/api-handlers.js",
+    "apps/weapp/utils/store.js",
+    "apps/weapp/data/demo.js",
+    "apps/weapp/data/ingested.js",
+    "services/ingest/src/review-actions.js",
+    "services/ingest/src/storage/file-store.js",
+    "services/ingest/src/storage/memory-store.js",
+    "services/ingest/src/publish/export-weapp-snapshot.js",
+    "services/ingest/src/publish/source-state.js",
+    "services/ingest/var/source-states.json"
+  ],
+  "directories": [
+    "services/ingest/var/production",
+    "services/ingest/var/review",
+    "services/ingest/var/alerts"
+  ]
+}

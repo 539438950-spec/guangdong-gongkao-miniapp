@@ -1,0 +1,18 @@
+{
+  "createdAt": "2026-06-10T00:49:31.705Z",
+  "sourceId": "ggfw-hrss-gd",
+  "sourceName": "广东省公务员考试录用管理系统",
+  "eventType": "publish",
+  "summary": "Published candidate snapshot",
+  "detail": "candidate=2026-06-10 00:49 候选版本 | stable=2026-06-10 00:49 稳定快照",
+  "releaseMode": "positions-open",
+  "releaseOverrideMode": "",
+  "reason": "",
+  "candidateVersionId": "ggfw-hrss-gd@2026-06-10T00:49:31.705Z",
+  "candidateVersionLabel": "2026-06-10 00:49 候选版本",
+  "stableVersionId": "ggfw-hrss-gd@2026-06-10T00:49:31.704Z",
+  "stableVersionLabel": "2026-06-10 00:49 稳定快照",
+  "id": "publish-audit-1781052571706-2",
+  "updatedAt": "2026-06-10T00:49:31.705Z",
+  "operator": ""
+}

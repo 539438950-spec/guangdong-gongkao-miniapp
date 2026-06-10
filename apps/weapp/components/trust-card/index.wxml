@@ -1,0 +1,33 @@
+<view class="{{showCard ? 'card' : ''}}" wx:if="{{trust}}">
+  <view class="section-title" wx:if="{{showTitle}}">{{title}}</view>
+  <view class="tag-row">
+    <view class="tag {{badgeClass || ((trust.parseQualityStatus === 'warning' || trust.parseQualityStatus === 'attachment-only') ? 'tag-warn' : '')}}">
+      {{trust.trustLabel}}
+    </view>
+    <view class="tag" wx:if="{{trust.sourceModeLabel}}">{{trust.sourceModeLabel}}</view>
+    <view class="tag {{trust.publishGateStatus === 'healthy' ? 'tag-active' : 'tag-warn'}}" wx:if="{{trust.publishGateLabel}}">
+      {{trust.publishGateLabel}}
+    </view>
+  </view>
+  <view class="muted" style="margin-top: 12rpx;">{{trust.parseQualitySummary}}</view>
+  <view class="muted" wx:if="{{showCoverage && trust.fieldCoveragePercent}}">字段覆盖率：{{trust.fieldCoveragePercent}}%</view>
+  <view class="muted" wx:if="{{showWorkbook && trust.workbookSheetSummary}}">工作表摘要：{{trust.workbookSheetSummary}}</view>
+  <view class="muted" wx:if="{{showFetch && trust.lastSuccessfulFetchedAt}}">最近成功抓取：{{trust.lastSuccessfulFetchedAt}}</view>
+  <view class="muted" wx:if="{{showPublish && trust.lastPublishedAt}}">最近成功发布：{{trust.lastPublishedAt}}</view>
+  <view class="muted" wx:if="{{showRun && trust.runStatusLabel}}">运行状态：{{trust.runStatusLabel}}</view>
+  <view class="muted" wx:if="{{showPublishDetail && trust.publishGateDetail}}">发布说明：{{trust.publishGateDetail}}</view>
+  <view class="muted" wx:if="{{showRiskSummary && trust.riskSummary}}">风险摘要：{{trust.riskSummary}}</view>
+  <view class="tag-row" style="margin-top: 16rpx;" wx:if="{{action && action.active}}">
+    <view class="button secondary compact-button" data-route="{{action.primaryRoute}}" catchtap="handleActionTap">
+      {{action.primaryLabel}}
+    </view>
+    <view
+      class="button secondary compact-button"
+      wx:if="{{action.secondaryLabel && action.secondaryRoute}}"
+      data-route="{{action.secondaryRoute}}"
+      catchtap="handleActionTap"
+    >
+      {{action.secondaryLabel}}
+    </view>
+  </view>
+</view>

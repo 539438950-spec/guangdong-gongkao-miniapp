@@ -1,0 +1,384 @@
+<view class="page" wx:if="{{group}}">
+  <view class="hero">
+    <view class="section-title">岗位对比</view>
+    <view>{{group.name}} · {{positions.length}} 个岗位</view>
+    <view class="muted" style="margin-top: 12rpx; color: rgba(255,255,255,0.76);">
+      先看硬门槛差异，再看地区、职位类型、数据可信度和其他要求。单组最多 4 个岗位。
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{contextSummary.originSummary || contextSummary.lastActionSummary}}">
+    <view class="section-title">方案来源</view>
+    <view class="compare-summary-row" wx:if="{{contextSummary.originSummary}}">
+      <view class="compare-summary-label">{{contextSummary.originLabel}}</view>
+      <view class="compare-summary-value">{{contextSummary.originSummary}}</view>
+    </view>
+    <view class="compare-summary-row" wx:if="{{contextSummary.lastActionSummary}}">
+      <view class="compare-summary-label">{{contextSummary.lastActionLabel}}</view>
+      <view class="compare-summary-value">{{contextSummary.lastActionSummary}}</view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{noticeContextSummary.active}}">
+    <view class="section-title">公告上下文</view>
+    <view class="item-title">{{noticeContextSummary.headline}}</view>
+    <view class="muted" wx:if="{{noticeContextSummary.detail}}" style="margin-top: 8rpx;">
+      {{noticeContextSummary.detail}}
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{noticeContextSummary.items.length}}">
+      <block wx:for="{{noticeContextSummary.items}}" wx:key="title">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.title}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{sourceContextSummary.active}}">
+    <view class="section-title">数据来源</view>
+    <view class="item-title">{{sourceContextSummary.headline}}</view>
+    <view class="muted" wx:if="{{sourceContextSummary.detail}}" style="margin-top: 8rpx;">
+      {{sourceContextSummary.detail}}
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{sourceContextSummary.items.length}}">
+      <block wx:for="{{sourceContextSummary.items}}" wx:key="id">
+        <view class="list-item">
+          <view class="tag-row">
+            <view class="tag {{item.isAggregated ? 'tag-active' : ''}}">{{item.roleLabel}}</view>
+            <view class="tag" wx:if="{{item.sourceName}}">{{item.sourceName}}</view>
+          </view>
+          <view class="item-title" style="margin-top: 12rpx;">{{item.title}}</view>
+          <view class="muted" style="margin-top: 8rpx;">{{item.summary}}</view>
+          <view class="muted" wx:if="{{item.detail}}" style="margin-top: 8rpx;">{{item.detail}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{decisionSummary.topTitle}}">
+    <view class="section-title">规则化结论</view>
+    <view class="item-title">{{decisionSummary.topTitle}}</view>
+    <view class="muted">{{decisionSummary.topAgency}} · {{decisionSummary.topLabel}} · {{decisionSummary.topScoreLabel}}</view>
+    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{decisionSummary.topReasons.length}}">
+      <block wx:for="{{decisionSummary.topReasons}}" wx:key="*this">
+        <view class="tag">{{item}}</view>
+      </block>
+    </view>
+    <view class="muted" style="margin-top: 12rpx;" wx:if="{{decisionSummary.focusFields.length}}">
+      优先关注字段：{{decisionSummary.focusFields.join('、')}}
+    </view>
+    <view class="muted" wx:if="{{decisionSummary.topCautions.length}}">
+      仍需注意：{{decisionSummary.topCautions.join('、')}}
+    </view>
+    <view class="muted" wx:if="{{decisionSummary.cautionCount}}">
+      当前有 {{decisionSummary.cautionCount}} 个岗位在规则评分上偏谨慎，建议回看门槛限制和附加要求。
+    </view>
+    <view class="muted" style="margin-top: 12rpx;">{{decisionSummary.helperText}}</view>
+  </view>
+
+  <view class="card" wx:if="{{decisionSummary.lowestBarrierTitle || decisionSummary.strictestTitle}}">
+    <view class="section-title">选岗提示</view>
+    <view wx:if="{{decisionSummary.lowestBarrierTitle}}">
+      <view class="item-title">限制相对最少</view>
+      <view class="muted">{{decisionSummary.lowestBarrierTitle}} · {{decisionSummary.lowestBarrierAgency}}</view>
+      <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{decisionSummary.lowestBarrierReasons.length}}">
+        <block wx:for="{{decisionSummary.lowestBarrierReasons}}" wx:key="*this">
+          <view class="tag">{{item}}</view>
+        </block>
+      </view>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{decisionSummary.strictestTitle}}">
+      <view class="item-title">限制相对更严</view>
+      <view class="muted">{{decisionSummary.strictestTitle}} · {{decisionSummary.strictestAgency}}</view>
+      <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{decisionSummary.strictestReasons.length}}">
+        <block wx:for="{{decisionSummary.strictestReasons}}" wx:key="*this">
+          <view class="tag tag-warn">{{item}}</view>
+        </block>
+      </view>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{decisionSummary.cautionItems.length}}">
+      <view class="filter-label">优先回看的岗位</view>
+      <block wx:for="{{decisionSummary.cautionItems}}" wx:key="id">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.title}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{positions.length}}">
+    <view class="section-title">个人条件匹配</view>
+    <view class="muted" wx:if="{{eligibilitySummary.active}}">{{eligibilitySummary.profileSummary}}</view>
+    <view class="muted" wx:else>还没有填写个人报考条件，暂时只展示通用规则判断。</view>
+    <view style="margin-top: 20rpx;" wx:if="{{decisionAlignmentSummary.active}}">
+      <view class="item-title">{{decisionAlignmentSummary.headline}}</view>
+      <view class="muted" style="margin-top: 8rpx;">{{decisionAlignmentSummary.detail}}</view>
+      <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{decisionAlignmentSummary.tags.length}}">
+        <block wx:for="{{decisionAlignmentSummary.tags}}" wx:key="*this">
+          <view class="tag">{{item}}</view>
+        </block>
+      </view>
+    </view>
+    <view class="metrics compare-metrics" style="margin-top: 20rpx;" wx:if="{{eligibilitySummary.active}}">
+      <view class="metric compare-metric">
+        <view>{{eligibilitySummary.matchedCount}}</view>
+        <view class="muted">完全匹配</view>
+      </view>
+      <view class="metric compare-metric">
+        <view>{{eligibilitySummary.blockedCount}}</view>
+        <view class="muted">存在不匹配</view>
+      </view>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{eligibilitySummary.active && eligibilitySummary.bestFitTitle}}">
+      <view class="item-title">{{eligibilitySummary.bestFitTitle}}</view>
+      <view class="muted">{{eligibilitySummary.bestFitAgency}} · {{eligibilitySummary.bestFitLabel}}</view>
+      <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{eligibilitySummary.bestFitReasons.length}}">
+        <block wx:for="{{eligibilitySummary.bestFitReasons}}" wx:key="*this">
+          <view class="tag {{eligibilitySummary.bestFitLabel === '当前最匹配' ? '' : 'tag-warn'}}">{{item}}</view>
+        </block>
+      </view>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{eligibilitySummary.active && eligibilitySummary.blockingItems.length}}">
+      <view class="filter-label">主要不匹配岗位</view>
+      <block wx:for="{{eligibilitySummary.blockingItems}}" wx:key="id">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.title}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="tag-row" style="margin-top: 16rpx;">
+      <view class="button secondary compact-button" bindtap="openProfile">
+        {{eligibilitySummary.active ? '修改个人条件' : '去填写个人条件'}}
+      </view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{actionPlanSummary.headline}}">
+    <view class="section-title">下一步动作</view>
+    <view class="item-title">{{actionPlanSummary.headline}}</view>
+    <view class="muted" style="margin-top: 8rpx;">{{actionPlanSummary.detail}}</view>
+    <view style="margin-top: 20rpx;" wx:if="{{actionPlanSummary.items.length}}">
+      <block wx:for="{{actionPlanSummary.items}}" wx:key="label">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.label}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{positions.length}}">
+    <view class="section-title">相似岗位推荐</view>
+    <view class="muted">从当前对比组里选一个基准岗位，继续找同考试类型下更相近的岗位，方便扩展方案。</view>
+    <view class="filter-label" style="margin-top: 20rpx;">推荐基准</view>
+    <view class="tag-row" style="margin-top: 12rpx;">
+      <block wx:for="{{positions}}" wx:key="id">
+        <view
+          class="tag {{recommendationBaseId === item.id ? 'tag-active' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="changeRecommendationBase"
+        >
+          {{item.title}}
+        </view>
+      </block>
+    </view>
+    <view class="muted" wx:if="{{recommendationContext.active}}" style="margin-top: 12rpx;">
+      当前基准岗位：{{recommendationContext.baseTitle}}{{recommendationContext.baseAgency ? ' · ' + recommendationContext.baseAgency : ''}}
+    </view>
+    <view class="muted" wx:if="{{recommendationContext.baseEligibilityLabel}}">
+      你的当前判断：{{recommendationContext.baseEligibilityLabel}}
+    </view>
+    <block wx:if="{{recommendedPositions.length}}">
+      <block wx:for="{{recommendedPositions}}" wx:key="id">
+        <view class="list-item">
+          <view class="item-title">{{item.title}}</view>
+          <view class="muted">{{item.agency}} · {{item.area}} · 招{{item.headcount}}人</view>
+          <view class="muted" wx:if="{{item.noticeTitle}}" style="margin-top: 8rpx;">
+            公告：{{item.noticeTitle}}
+          </view>
+          <view class="muted" wx:if="{{item.noticeStageLabel || item.noticePublishedAt}}">
+            {{item.noticeStageLabel || '公告'}}<text wx:if="{{item.noticePublishedAt}}"> · {{item.noticePublishedAt}}</text>
+          </view>
+          <view class="tag-row" style="margin-top: 12rpx;">
+            <block wx:for="{{item.reasons}}" wx:key="*this">
+              <view class="tag">{{item}}</view>
+            </block>
+            <view
+              class="tag {{item.noticeTrust && (item.noticeTrust.parseQualityStatus === 'warning' || item.noticeTrust.parseQualityStatus === 'attachment-only') ? 'tag-warn' : ''}}"
+              wx:if="{{item.noticeTrust}}"
+            >
+              {{item.noticeTrust.trustLabel}}
+            </view>
+          </view>
+          <view class="muted" wx:if="{{item.profileHint}}" style="margin-top: 8rpx;">{{item.profileHint}}</view>
+          <view class="muted" wx:if="{{item.reasonSummary}}" style="margin-top: 8rpx;">{{item.reasonSummary}}</view>
+          <view class="muted" wx:if="{{item.eligibilityLabel}}" style="margin-top: 8rpx;">当前判断：{{item.eligibilityLabel}}</view>
+          <view class="muted" wx:if="{{item.nextActionSummary}}" style="margin-top: 8rpx;">下一步：{{item.nextActionSummary}}</view>
+          <view class="muted" wx:if="{{item.compareHint}}" style="margin-top: 8rpx;">对比建议：{{item.compareHint}}</view>
+          <view class="tag-row" style="margin-top: 12rpx;">
+            <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="addRecommendedToCompare">
+              {{item.compareActionLabel || '加入对比'}}
+            </view>
+            <view class="button secondary compact-button" data-notice-id="{{item.noticeId}}" bindtap="openPositions">回到岗位页</view>
+            <view class="button secondary compact-button" data-notice-id="{{item.noticeId}}" bindtap="openNoticeDetail">查看公告</view>
+          </view>
+        </view>
+      </block>
+    </block>
+    <view class="muted" wx:else style="margin-top: 16rpx;">当前没有更多可推荐的相似岗位。</view>
+  </view>
+
+  <view class="card" wx:if="{{groups.length > 1}}">
+    <view class="section-title">切换对比组</view>
+    <view class="tag-row">
+      <block wx:for="{{groups}}" wx:key="id">
+        <view class="tag {{currentGroupId === item.id ? 'tag-active' : ''}}" data-id="{{item.id}}" bindtap="changeGroup">{{item.name}}</view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">方案管理</view>
+    <input
+      class="search-input"
+      placeholder="输入对比方案名称"
+      value="{{draftGroupName}}"
+      bindinput="onGroupNameInput"
+    />
+    <view class="filter-label" style="margin-top: 20rpx;">查看顺序</view>
+    <view class="tag-row" style="margin-top: 12rpx;">
+      <view class="tag {{sortMode === 'manual' ? 'tag-active' : ''}}" data-mode="manual" bindtap="changeSortMode">原顺序</view>
+      <view class="tag {{sortMode === 'rule' ? 'tag-active' : ''}}" data-mode="rule" bindtap="changeSortMode">规则分优先</view>
+      <view class="tag {{sortMode === 'eligibility' ? 'tag-active' : ''}}" data-mode="eligibility" bindtap="changeSortMode">个人匹配优先</view>
+    </view>
+    <view class="filter-actions">
+      <view class="button secondary compact-button" bindtap="saveGroupName">保存名称</view>
+      <view class="button secondary compact-button" bindtap="copySummary">复制摘要</view>
+      <view class="button secondary compact-button" bindtap="createGroup">新建方案</view>
+      <view class="button secondary compact-button" bindtap="deleteGroup">删除当前</view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{positions.length}}">
+    <view class="section-title">差异摘要</view>
+    <view class="metrics compare-metrics">
+      <block wx:for="{{differenceSummary.stats}}" wx:key="label">
+        <view class="metric compare-metric">
+          <view>{{item.value}}</view>
+          <view class="muted">{{item.label}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="filter-label" style="margin-top: 20rpx;">字段聚焦</view>
+    <view class="tag-row" style="margin-top: 12rpx;">
+      <view class="tag {{rowFocusMode === 'all' ? 'tag-active' : ''}}" data-mode="all" bindtap="changeRowFocusMode">
+        全部字段（{{rowFocusSummary.totalCount}}）
+      </view>
+      <view class="tag {{rowFocusMode === 'different' ? 'tag-active' : ''}}" data-mode="different" bindtap="changeRowFocusMode">
+        只看差异（{{rowFocusSummary.differentCount}}）
+      </view>
+      <view class="tag {{rowFocusMode === 'barrier' ? 'tag-active' : ''}}" data-mode="barrier" bindtap="changeRowFocusMode">
+        只看门槛（{{rowFocusSummary.barrierCount}}<text wx:if="{{rowFocusSummary.mismatchCount}}"> · 不匹配 {{rowFocusSummary.mismatchCount}}</text>）
+      </view>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{differenceSummary.sharedFields.length}}">
+      <view class="filter-label">一致项</view>
+      <view class="tag-row">
+        <block wx:for="{{differenceSummary.sharedFields}}" wx:key="*this">
+          <view class="tag">{{item}}</view>
+        </block>
+      </view>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{differenceSummary.differentFields.length}}">
+      <view class="filter-label">拉开差距的字段</view>
+      <block wx:for="{{differenceSummary.differentFields}}" wx:key="label">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.label}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card compare-grid">
+    <block wx:for="{{columns}}" wx:key="id">
+      <view class="compare-column">
+        <view class="item-title">{{item.title}}</view>
+        <view class="muted">{{item.agency}}</view>
+        <view class="muted" wx:if="{{item.noticeTitle}}" style="margin-top: 8rpx;">
+          公告：{{item.noticeTitle}}
+        </view>
+        <view class="muted" wx:if="{{item.noticeStageLabel || item.noticePublishedAt}}">
+          {{item.noticeStageLabel || '公告'}}<text wx:if="{{item.noticePublishedAt}}"> · {{item.noticePublishedAt}}</text>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.sourceTraceLabel || item.sourceTraceName}}">
+          <view class="tag {{item.sourceTraceAggregated ? 'tag-active' : ''}}" wx:if="{{item.sourceTraceLabel}}">
+            {{item.sourceTraceLabel}}
+          </view>
+          <view class="tag" wx:if="{{item.sourceTraceName}}">{{item.sourceTraceName}}</view>
+        </view>
+        <view class="muted" wx:if="{{item.sourceTraceSummary}}" style="margin-top: 8rpx;">
+          {{item.sourceTraceSummary}}
+        </view>
+        <view class="muted" wx:if="{{item.sourceTraceDetail}}">
+          {{item.sourceTraceDetail}}
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view class="tag">{{item.ruleLabel}}</view>
+          <view class="tag">{{item.ruleScoreLabel}}</view>
+          <view class="tag tag-warn" wx:if="{{item.hasManualCorrections}}">已人工纠错</view>
+        </view>
+        <view class="muted" style="margin-top: 8rpx;" wx:if="{{item.opportunityReasons.length}}">
+          机会点：{{item.opportunityReasons.join('、')}}
+        </view>
+        <view class="muted" wx:if="{{item.cautionReasons.length}}">
+          谨慎点：{{item.cautionReasons.join('、')}}
+        </view>
+        <view class="muted" wx:if="{{item.mismatchReasons.length}}">
+          不匹配项：{{item.mismatchReasons.join('、')}}
+        </view>
+        <view class="muted" wx:if="{{item.majorMatchSummary}}">专业命中：{{item.majorMatchSummary}}</view>
+        <view class="muted" wx:if="{{item.nextAction}}" style="margin-top: 8rpx;">
+          下一步：{{item.nextAction.label}} · {{item.nextAction.detail}}
+        </view>
+        <view class="muted" wx:if="{{item.correctionSummary}}" style="margin-top: 8rpx;">
+          人工纠错：{{item.correctionSummary}}
+        </view>
+        <trust-card
+          wx:if="{{item.noticeTrust}}"
+          trust="{{item.noticeTrust}}"
+          action="{{item.trustAction}}"
+          showCard="{{false}}"
+          showTitle="{{false}}"
+          showCoverage="{{false}}"
+          showWorkbook="{{false}}"
+          showFetch="{{false}}"
+          showPublish="{{false}}"
+          showRun="{{false}}"
+          showPublishDetail="{{false}}"
+          showRiskSummary="{{false}}"
+          bind:actiontap="openTrustRoute"
+        />
+        <view class="tag-row" style="margin-top: 16rpx;">
+          <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="removeFromCompare">移出对比</view>
+          <view class="button secondary compact-button" data-notice-id="{{item.noticeId}}" bindtap="openPositions">回到岗位页</view>
+          <view class="button secondary compact-button" data-notice-id="{{item.noticeId}}" bindtap="openNoticeDetail">查看公告</view>
+        </view>
+        <block wx:for="{{item.rows}}" wx:key="label">
+          <view class="row-label {{item.isMismatch ? 'compare-mismatch-label' : (item.isDifferent ? 'compare-diff-label' : '')}}">{{item.label}}</view>
+          <view class="row-value {{item.isMismatch ? 'compare-mismatch-value' : (item.isDifferent ? 'compare-diff-value' : '')}}">{{item.value}}</view>
+        </block>
+      </view>
+    </block>
+  </view>
+</view>
+
+<view class="page" wx:else>
+  <view class="card">
+    <view class="section-title">岗位对比</view>
+    <view class="muted">当前还没有可用的对比组，请先从岗位列表加入岗位。</view>
+  </view>
+</view>

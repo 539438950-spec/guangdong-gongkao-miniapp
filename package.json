@@ -1,0 +1,14 @@
+{
+  "name": "guangdong-gongkao-miniapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test packages/shared/test/*.test.js services/ingest/test/*.test.js apps/weapp/test/*.test.js",
+    "ingest:demo": "node services/ingest/src/index.js",
+    "ingest:watch": "node services/ingest/src/index.js --watch",
+    "ingest:health": "node scripts/ingest-health-report.js",
+    "api:start": "node services/api/src/index.js",
+    "cloud:sync": "node scripts/sync-cloudfunction.js"
+  }
+}

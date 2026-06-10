@@ -1,0 +1,223 @@
+<view class="page">
+  <view class="hero">
+    <view class="section-title">数据源状态</view>
+    <view>查看已接入来源最近抓取、发布、回退、解析质量和待复核情况。</view>
+    <view class="muted" style="margin-top: 12rpx;">当前连接：{{connectionSummary.modeLabel}} · {{connectionSummary.presetLabel}}</view>
+    <view class="muted">配置来源：{{connectionSummary.sourceLabel}}</view>
+    <view class="muted">{{connectionSummary.endpointLabel}}</view>
+    <view class="muted" wx:if="{{connectionSummary.hint}}">{{connectionSummary.hint}}</view>
+    <view class="muted" wx:if="{{sourceName || focusLabel}}" style="margin-top: 12rpx;">
+      当前聚焦：{{sourceName || '全部来源'}}{{focusLabel ? ' · ' + focusLabel : ''}}
+    </view>
+    <view class="muted" style="margin-top: 12rpx;">超时未更新 {{summary.overdueSourceCount}} 个来源，最近告警 {{summary.alertEventCount}} 条。</view>
+    <view class="metrics" style="margin-top: 24rpx;">
+      <view class="metric">
+        <view>{{summary.sourceCount}}</view>
+        <view class="muted">来源数</view>
+      </view>
+      <view class="metric">
+        <view>{{summary.sourceAlertCount}}</view>
+        <view class="muted">风险来源</view>
+      </view>
+      <view class="metric">
+        <view>{{summary.pendingReviewTotal}}</view>
+        <view class="muted">待复核</view>
+      </view>
+      <view class="metric">
+        <view>{{summary.parseIssueCount}}</view>
+        <view class="muted">解析风险</view>
+      </view>
+      <view class="metric">
+        <view>{{summary.publishableCount}}</view>
+        <view class="muted">可发布</view>
+      </view>
+      <view class="metric">
+        <view>{{summary.restrictedCount}}</view>
+        <view class="muted">受限</view>
+      </view>
+      <view class="metric">
+        <view>{{summary.gateBlockedCount}}</view>
+        <view class="muted">闸门阻塞</view>
+      </view>
+      <view class="metric">
+        <view>{{summary.rollbackCount}}</view>
+        <view class="muted">已回退</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{summary.gateFailureTypeSummary && summary.gateFailureTypeSummary.length}}">
+    <view class="section-title">闸门卡点汇总</view>
+    <view class="muted">按当前来源的首个失败或告警检查项汇总，优先处理最常见的阻塞点。</view>
+    <block wx:for="{{summary.gateFailureTypeSummary}}" wx:key="label">
+      <view class="list-item">
+        <view class="item-title">{{item.label}}</view>
+        <view class="muted">涉及 {{item.count}} 个来源</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="card">
+    <view class="section-title">来源列表</view>
+    <view class="button secondary" style="margin-bottom: 16rpx;" bindtap="openReviewCenter">打开复核中心</view>
+    <view class="muted" style="margin-bottom: 16rpx;">{{releaseControlHint}}</view>
+    <block wx:for="{{sourceStates}}" wx:key="sourceId">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag">{{item.examTypeLabel}}</view>
+          <view class="tag {{item.sourceMode === 'demo' ? 'tag-warn' : ''}}">{{item.sourceModeLabel}}</view>
+          <view class="tag {{item.consecutiveFailureCount || item.pendingReviewCount || item.structureAlert || item.fetchOverdue || item.publishOverdue ? 'tag-active' : ''}}">
+            {{item.runStatusLabel}}
+          </view>
+          <view class="tag {{item.fetchOverdue || item.publishOverdue ? 'tag-active' : ''}}">
+            {{item.slaStatusLabel}}
+          </view>
+          <view class="tag {{item.parseQualityStatus === 'warning' || (item.parseQualityStatus === 'attachment-only' && !item.attachmentOnlyExpected) ? 'tag-active' : ''}}">
+            {{item.parseQualityLabel}}
+          </view>
+        </view>
+        <view class="item-title">{{item.sourceName}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.publishGate}}">
+          <view class="tag {{item.publishGate.tone === 'warn' ? 'tag-warn' : (item.publishGate.tone === 'ok' ? 'tag-active' : '')}}">
+            发布闸门
+          </view>
+          <view class="tag">{{item.publishGate.label}}</view>
+        </view>
+        <view class="muted" wx:if="{{item.publishGate && item.publishGate.detail}}" style="margin-top: 8rpx;">
+          {{item.publishGate.detail}}
+        </view>
+        <view class="muted" wx:if="{{item.riskSummary && item.riskSummary.headline}}" style="margin-top: 8rpx;">
+          当前风险：{{item.riskSummary.headline}}
+        </view>
+        <view class="muted" wx:if="{{item.riskSummary && item.riskSummary.detail}}">{{item.riskSummary.detail}}</view>
+        <view class="muted">轮询周期：{{item.scheduleMinutes}} 分钟 · 发布 SLA：{{item.publishSlaMinutes}} 分钟</view>
+        <view class="muted">时效状态：{{item.slaStatusLabel}}</view>
+        <view class="muted">最近抓取尝试：{{item.lastFetchedAt || '暂无'}}</view>
+        <view class="muted">最近成功抓取：{{item.lastSuccessfulFetchedAt || '暂无'}}</view>
+        <view class="muted">下次应抓取：{{item.nextFetchDueAt || '暂无'}}</view>
+        <view class="muted" wx:if="{{item.candidateVersionLabel || item.candidateVersionId}}">
+          当前候选版本：{{item.candidateVersionLabel || item.candidateVersionId}}
+        </view>
+        <view class="muted" wx:if="{{item.candidateVersionCreatedAt}}">候选版本生成时间：{{item.candidateVersionCreatedAt}}</view>
+        <view class="muted">最近成功发布：{{item.lastPublishedAt || '暂无'}}</view>
+        <view class="muted" wx:if="{{item.stableVersionLabel || item.stableVersionId}}">
+          当前稳定版本：{{item.stableVersionLabel || item.stableVersionId}}
+        </view>
+        <view class="muted" wx:if="{{item.stableVersionUpdatedAt}}">稳定版本发布时间：{{item.stableVersionUpdatedAt}}</view>
+        <view class="muted" wx:if="{{item.gateCheckSummary && item.gateCheckSummary.summary}}">
+          发布闸门校验：{{item.gateCheckSummary.summary}}
+        </view>
+        <view class="muted" wx:if="{{item.gateChecks && item.gateChecks.length}}">
+          最近卡点：{{item.gateChecks[0].label}} · {{item.gateChecks[0].status}}{{item.gateChecks[0].detail ? ' · ' + item.gateChecks[0].detail : ''}}
+        </view>
+        <view class="muted" wx:if="{{item.nextAction && item.nextAction.label}}">
+          下一步：{{item.nextAction.label}}{{item.nextAction.detail ? ' · ' + item.nextAction.detail : ''}}
+        </view>
+        <view class="muted" wx:if="{{item.releaseModeLabel}}">前台发布模式：{{item.releaseModeLabel}}</view>
+        <view class="muted" wx:if="{{item.releaseOverrideActive}}">
+          人工发布策略：{{item.releaseOverrideMode || '自动'}}{{item.releaseOverrideUpdatedAt ? ' · ' + item.releaseOverrideUpdatedAt : ''}}
+        </view>
+        <view class="muted" wx:if="{{item.releaseOverrideReason}}">人工策略原因：{{item.releaseOverrideReason}}</view>
+        <view class="muted" wx:if="{{item.releaseOverrideBlockedReason}}">人工策略未生效：{{item.releaseOverrideBlockedReason}}</view>
+        <view class="muted">下次应发布：{{item.nextPublishDueAt || '暂无'}}</view>
+        <view class="muted">公告发布时间：{{item.lastNoticePublishedAt || '暂无'}}</view>
+        <view class="muted" wx:if="{{item.sourceModeNote}}">来源说明：{{item.sourceModeNote}}</view>
+        <view class="muted">距上次抓取：{{item.fetchLagMinutes === null ? '暂无' : item.fetchLagMinutes + ' 分钟'}}</view>
+        <view class="muted">距上次成功：{{item.publishLagMinutes === null ? '暂无' : item.publishLagMinutes + ' 分钟'}}</view>
+        <view class="muted">连续失败：{{item.consecutiveFailureCount || 0}} 次</view>
+        <view class="muted">待复核：{{item.pendingReviewCount || 0}} 条</view>
+        <view class="muted">岗位表解析：{{item.parseQualityLabel}}</view>
+        <view class="muted" wx:if="{{item.parseQualitySummary}}">{{item.parseQualitySummary}}</view>
+        <view class="muted" wx:if="{{item.lastRowsTotal}}">结构化岗位数：{{item.lastRowsTotal}}</view>
+        <view class="muted" wx:if="{{item.workbookSheetCount}}">命中工作表：{{item.workbookSheetCount}} 个</view>
+        <view class="muted" wx:if="{{item.workbookSheetSummary}}">工作表摘要：{{item.workbookSheetSummary}}</view>
+        <view class="muted" wx:if="{{item.candidateWorkbookCount || item.extractedWorkbookCount}}">
+          附件候选：{{item.candidateWorkbookCount || 0}} 个，解包表格：{{item.extractedWorkbookCount || 0}} 个
+        </view>
+        <view class="muted" wx:if="{{item.parseErrorCount}}">解析错误：{{item.parseErrorCount}} 个</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.pendingReviewCount}}">
+          <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" bindtap="focusReviewCenter">查看该来源复核</view>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.stalePendingReviewCount}}">
+          <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-review-focus="stale" bindtap="focusReviewCenter">清理历史复核</view>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.publishGate && item.publishGate.focus === 'review'}}">
+          <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-review-focus="blocking" bindtap="focusReviewCenter">处理待复核</view>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.publishGate && item.publishGate.focus && item.publishGate.focus !== 'review'}}">
+          <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-focus="{{item.publishGate.focus}}" bindtap="openFocusedStatus">
+            查看对应风险
+          </view>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{canManageReleaseControls}}">
+          <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-mode="notice-only" bindtap="applyReleaseOverride">
+            锁定仅公告
+          </view>
+          <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-mode="positions-open" bindtap="applyReleaseOverride">
+            开放岗位能力
+          </view>
+          <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-mode="" bindtap="applyReleaseOverride">
+            恢复自动
+          </view>
+        </view>
+        <view class="muted" wx:if="{{releaseActionBusySourceId === item.sourceId}}">正在更新发布策略...</view>
+        <view class="muted" wx:if="{{item.fetchOverdue || item.publishOverdue}}">
+          SLA 告警：{{item.fetchOverdue ? '抓取超时' : ''}}{{item.fetchOverdue && item.publishOverdue ? ' · ' : ''}}{{item.publishOverdue ? '发布超时' : ''}}
+        </view>
+        <view class="muted" wx:if="{{item.structureAlert}}">
+          结构告警：{{item.structureChangeSummary || '来源页面结构发生变化'}}{{item.lastStructureChangedAt ? ' · ' + item.lastStructureChangedAt : ''}}
+        </view>
+        <view class="muted" wx:if="{{item.structureSummary}}">结构摘要：{{item.structureSummary}}</view>
+        <view class="muted" wx:if="{{item.lastRollback}}">最近一次运行触发了稳定版本回退</view>
+        <view class="muted" wx:if="{{item.rollbackReason}}">回退原因：{{item.rollbackReason}}</view>
+        <view class="muted" wx:if="{{item.gateFailureReason}}">闸门拒绝原因：{{item.gateFailureReason}}</view>
+        <view class="muted" wx:if="{{item.lastErrorSummary}}">最近错误：{{item.lastErrorSummary}}</view>
+
+        <view class="muted" wx:if="{{item.recentAudits && item.recentAudits.length}}" style="margin-top: 12rpx;">最近发布审计：</view>
+        <block wx:for="{{item.recentAudits}}" wx:key="id">
+          <view class="muted">{{item.createdAt}} · {{item.summary}}{{item.detail ? ' · ' + item.detail : ''}}</view>
+        </block>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!sourceStates.length}}">当前还没有可展示的数据源状态。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">最近发布审计</view>
+    <block wx:for="{{publishAudits}}" wx:key="id">
+      <view class="list-item">
+        <view class="item-title">{{item.summary}}</view>
+        <view class="muted">{{item.sourceName}} · {{item.createdAt || '暂无'}}</view>
+        <view class="muted" wx:if="{{item.detail}}">{{item.detail}}</view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!publishAudits.length}}">当前还没有最近发布审计。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">最近告警</view>
+    <block wx:for="{{alertEvents}}" wx:key="id">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{item.severity === 'high' ? 'tag-active' : ''}}">{{item.severity || 'info'}}</view>
+          <view class="tag">{{item.type}}</view>
+        </view>
+        <view class="item-title">{{item.summary}}</view>
+        <view class="muted">{{item.sourceName}} · {{item.createdAt || '暂无'}}</view>
+        <view class="muted" wx:if="{{item.details}}">{{item.details}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view
+            class="button secondary compact-button"
+            data-source-id="{{item.sourceId}}"
+            data-action="{{item.type === 'review-queued' ? 'review' : 'status'}}"
+            data-focus="{{item.type === 'review-queued' ? '' : (item.type === 'structure-change' ? 'structure' : ((item.type === 'sla-overdue' || item.type === 'sla-warning') ? 'sla' : 'run'))}}"
+            bindtap="openAlertAction"
+          >
+            {{item.type === 'review-queued' ? '打开复核中心' : '查看对应状态'}}
+          </view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!alertEvents.length}}">当前还没有最近告警。</view>
+  </view>
+</view>

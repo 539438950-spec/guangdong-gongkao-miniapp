@@ -1,0 +1,151 @@
+<view class="page">
+  <view class="hero">
+    <view class="section-title">站内消息</view>
+    <view>聚合公告进度提醒、数据告警、订阅新增命中和最近浏览提醒。</view>
+    <view class="metrics" style="margin-top: 24rpx;">
+      <view class="metric">
+        <view>{{unreadCount}}</view>
+        <view class="muted">未读提醒</view>
+      </view>
+      <view class="metric">
+        <view>{{messages.length}}</view>
+        <view class="muted">全部消息</view>
+      </view>
+      <view class="metric">
+        <view>{{progressMessageCount}}</view>
+        <view class="muted">进度提醒</view>
+      </view>
+      <view class="metric">
+        <view>{{subscriptionMessageCount}}</view>
+        <view class="muted">订阅消息</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">公告进度提醒</view>
+    <block wx:for="{{progressMessages}}" wx:key="id">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{item.read ? '' : 'tag-active'}}">{{item.read ? '已读' : '未读'}}</view>
+          <view class="tag">{{item.typeLabel}}</view>
+        </view>
+        <view class="item-title">{{item.title}}</view>
+        <view class="muted" style="margin-top: 8rpx;">{{item.summary}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.priorityLabel}}">
+          <view class="tag tag-active">{{item.priorityLabel}}</view>
+          <block wx:for="{{item.priorityTags}}" wx:key="*this">
+            <view class="tag">{{item}}</view>
+          </block>
+        </view>
+        <view class="muted" wx:if="{{item.prioritySummary}}" style="margin-top: 8rpx;">
+          建议：{{item.prioritySummary}}
+        </view>
+        <view class="muted" wx:if="{{item.nextActionSummary}}" style="margin-top: 8rpx;">
+          下一步：{{item.nextActionSummary}}
+        </view>
+        <view class="muted" wx:if="{{item.compareHint}}" style="margin-top: 8rpx;">
+          对比建议：{{item.compareHint}}
+        </view>
+        <view class="muted" wx:if="{{item.compareFallbackSummary}}" style="margin-top: 8rpx;">
+          {{item.compareFallbackSummary}}
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="openMessage">{{item.actionLabel}}</view>
+          <view
+            class="button secondary compact-button"
+            data-id="{{item.id}}"
+            wx:if="{{item.compareActionLabel}}"
+            bindtap="quickCompareProgressMessage"
+          >
+            {{item.compareActionLabel}}
+          </view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!progressMessages.length}}">当前还没有公告进度提醒。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">订阅消息</view>
+    <block wx:for="{{subscriptionMessages}}" wx:key="id">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{item.read ? '' : 'tag-active'}}">{{item.read ? '已读' : '未读'}}</view>
+          <view class="tag">{{item.typeLabel}}</view>
+        </view>
+        <view class="item-title">{{item.title}}</view>
+        <view class="muted" style="margin-top: 8rpx;">{{item.summary}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.priorityLabel}}">
+          <view class="tag tag-active">{{item.priorityLabel}}</view>
+          <block wx:for="{{item.priorityTags}}" wx:key="*this">
+            <view class="tag">{{item}}</view>
+          </block>
+        </view>
+        <view class="muted" wx:if="{{item.prioritySummary}}" style="margin-top: 8rpx;">
+          建议：{{item.prioritySummary}}
+        </view>
+        <view class="muted" wx:if="{{item.newPositionPreview && item.newPositionPreview.length}}" style="margin-top: 8rpx;">
+          新增岗位：{{item.newPositionPreview[0].title}}
+        </view>
+        <view class="muted" wx:if="{{item.bestMatchSummary}}" style="margin-top: 8rpx;">
+          优先看：{{item.bestMatchSummary}}
+        </view>
+        <view class="muted" wx:if="{{item.nextActionSummary}}" style="margin-top: 8rpx;">
+          下一步：{{item.nextActionSummary}}
+        </view>
+        <view class="muted" wx:if="{{item.compareHint}}" style="margin-top: 8rpx;">
+          对比建议：{{item.compareHint}}
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="openMessage">{{item.actionLabel}}</view>
+          <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="quickCompareMessage">
+            {{item.compareActionLabel || (item.compareReady ? '直接对比新命中' : '先去调整对比方案')}}
+          </view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!subscriptionMessages.length}}">当前还没有订阅消息。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">数据告警</view>
+    <block wx:for="{{alertMessages}}" wx:key="id">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{item.read ? '' : 'tag-active'}}">{{item.read ? '已读' : '未读'}}</view>
+          <view class="tag">{{item.typeLabel}}</view>
+        </view>
+        <view class="item-title">{{item.title}}</view>
+        <view class="muted" style="margin-top: 8rpx;">{{item.summary}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="openMessage">{{item.actionLabel}}</view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!alertMessages.length}}">当前还没有数据告警。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">其他消息</view>
+    <block wx:for="{{otherMessages}}" wx:key="id">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{item.read ? '' : 'tag-active'}}">{{item.read ? '已读' : '未读'}}</view>
+          <view class="tag">{{item.typeLabel}}</view>
+        </view>
+        <view class="item-title">{{item.title}}</view>
+        <view class="muted" style="margin-top: 8rpx;">{{item.summary}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="openMessage">{{item.actionLabel}}</view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!otherMessages.length}}">当前还没有其他消息。</view>
+  </view>
+
+  <view class="card" wx:if="{{!messages.length}}">
+    <view class="section-title">消息列表</view>
+    <view class="muted" wx:if="{{!messages.length}}">当前还没有消息。</view>
+  </view>
+</view>

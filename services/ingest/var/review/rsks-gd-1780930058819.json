@@ -1,0 +1,13 @@
+{
+  "sourceId": "rsks-gd",
+  "reason": [
+    "request failed: 404"
+  ],
+  "rawPayload": null,
+  "id": "rsks-gd-1780930058819",
+  "createdAt": "2026-06-08T14:47:38.819Z",
+  "status": "resolved",
+  "resolutionNote": "自动关闭：后续已有稳定成功版本，判定为历史瞬时错误。",
+  "resolvedAt": "2026-06-10T01:21:31.168Z",
+  "updatedAt": "2026-06-10T01:21:31.168Z"
+}

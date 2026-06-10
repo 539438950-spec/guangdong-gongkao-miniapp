@@ -1,0 +1,10 @@
+{
+  "sourceId": "rsks-gd",
+  "startedAt": "2026-06-08T14:37:22.886Z",
+  "finishedAt": "2026-06-08T14:37:23.441Z",
+  "published": false,
+  "rollback": true,
+  "errors": [
+    "connect EACCES 120.197.33.7:443"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "sourceId": "rsks-gd",
+  "startedAt": "2026-06-08T14:32:19.989Z",
+  "finishedAt": "2026-06-08T14:32:21.048Z",
+  "published": false,
+  "rollback": true,
+  "errors": [
+    "fetch failed"
+  ]
+}

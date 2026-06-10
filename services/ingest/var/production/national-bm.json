@@ -1,0 +1,130 @@
+{
+  "source": {
+    "id": "national-bm",
+    "name": "国家公务员局专题",
+    "baseUrl": "https://bm.scs.gov.cn/",
+    "examType": "national",
+    "scheduleMinutes": 30,
+    "publishSlaMinutes": 60,
+    "enabled": true,
+    "parserType": "html",
+    "indexUrls": [],
+    "metadata": {
+      "mode": "demo",
+      "modeLabel": "演示",
+      "modeNote": "当前环境无法直连国考官方站点，暂用演示数据占位。"
+    }
+  },
+  "notice": {
+    "id": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z",
+    "sourceId": "national-bm",
+    "examType": "national",
+    "area": "全国/广东岗位",
+    "title": "2026年度国家公务员考试公告",
+    "url": "https://bm.scs.gov.cn/demo/2026-national",
+    "publishedAt": "2026-10-14T00:00:00.000Z",
+    "updatedAt": "2026-10-14T00:00:00.000Z",
+    "registrationStart": "2026年10月15日08:00至10月24日18:00",
+    "registrationEnd": null,
+    "writtenExamAt": "2026年11月29日",
+    "summary": "面向国考考生的公告演示数据。",
+    "attachments": [
+      {
+        "name": "职位表.xlsx",
+        "url": "https://bm.scs.gov.cn/demo/2026-national-positions.xlsx"
+      }
+    ],
+    "contentHash": "demo-national-digest",
+    "status": "validated"
+  },
+  "batch": {
+    "id": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z:batch:1",
+    "noticeId": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z",
+    "sourceId": "national-bm",
+    "attachmentUrl": "https://bm.scs.gov.cn/demo/2026-national-positions.xlsx",
+    "version": 1,
+    "parseStatus": "parsed",
+    "parseLog": [
+      "loaded demo attachment",
+      "mapped 2 rows"
+    ],
+    "rowsTotal": 2
+  },
+  "positions": [
+    {
+      "id": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z:batch:1:row:1",
+      "sourceId": "national-bm",
+      "noticeId": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z",
+      "batchId": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z:batch:1",
+      "examType": "national",
+      "area": "广州",
+      "agency": "海关总署广东分署",
+      "title": "综合业务一级主任科员以下",
+      "positionCode": "130110001",
+      "positionType": "综合管理类",
+      "headcount": 2,
+      "educationRaw": "本科以上",
+      "educationLevel": "undergraduate",
+      "degreeRaw": "学士以上",
+      "degreeLevel": "bachelor",
+      "majorRaw": "法学类、经济学类",
+      "majorTags": [
+        "法学类",
+        "经济学类"
+      ],
+      "majorCodes": [],
+      "serviceRequirement": "不限",
+      "freshGraduateOnly": false,
+      "politicalStatus": "不限",
+      "notes": "需通过体能测评",
+      "examArea": "广州",
+      "publishedAt": "2026-10-14T00:00:00.000Z",
+      "sourceNoticeTitle": "2026年度国家公务员考试公告",
+      "sourceUrl": "https://bm.scs.gov.cn/demo/2026-national",
+      "normalizedReady": true,
+      "expired": false,
+      "hasManualCorrections": false,
+      "correctedFields": [],
+      "correctionSummary": "",
+      "correctionLog": []
+    },
+    {
+      "id": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z:batch:1:row:2",
+      "sourceId": "national-bm",
+      "noticeId": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z",
+      "batchId": "national-bm|https://bm.scs.gov.cn/demo/2026-national|2026年度国家公务员考试公告|2026-10-14T00:00:00.000Z:batch:1",
+      "examType": "national",
+      "area": "广州",
+      "agency": "广州海关",
+      "title": "财务管理一级主任科员以下",
+      "positionCode": "130110002",
+      "positionType": "综合管理类",
+      "headcount": 1,
+      "educationRaw": "研究生",
+      "educationLevel": "postgraduate",
+      "degreeRaw": "硕士",
+      "degreeLevel": "master",
+      "majorRaw": "财政学类、会计学类",
+      "majorTags": [
+        "财政学类",
+        "会计学类"
+      ],
+      "majorCodes": [],
+      "serviceRequirement": "应届",
+      "freshGraduateOnly": true,
+      "politicalStatus": "不限",
+      "notes": "限2026届毕业生",
+      "examArea": "广州",
+      "publishedAt": "2026-10-14T00:00:00.000Z",
+      "sourceNoticeTitle": "2026年度国家公务员考试公告",
+      "sourceUrl": "https://bm.scs.gov.cn/demo/2026-national",
+      "normalizedReady": true,
+      "expired": false,
+      "hasManualCorrections": false,
+      "correctedFields": [],
+      "correctionSummary": "",
+      "correctionLog": []
+    }
+  ],
+  "publishedAt": "2026-06-10T01:42:55.232Z"
+}

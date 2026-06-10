@@ -1,0 +1,65 @@
+.summary-block {
+  margin-top: 18rpx;
+  padding: 20rpx;
+  background: #f7f9fc;
+  border: 1rpx solid #d7e0eb;
+  border-radius: 18rpx;
+}
+
+.summary-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 12rpx;
+}
+
+.summary-label {
+  color: #6b7280;
+}
+
+.summary-value {
+  flex: 1;
+  text-align: right;
+  color: #14213d;
+  word-break: break-all;
+}
+
+.preset-card {
+  margin-top: 16rpx;
+  padding: 20rpx;
+  border: 1rpx solid #d7e0eb;
+  border-radius: 18rpx;
+  background: #ffffff;
+}
+
+.preset-card-active {
+  background: #edf4fb;
+  border-color: #14558f;
+}
+
+.preset-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.preset-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #14213d;
+}
+
+.preset-desc {
+  margin-top: 8rpx;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 18rpx;
+}

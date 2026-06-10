@@ -1,0 +1,13 @@
+{
+  "projectname": "guangdong-gongkao",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "cloudfunctionRoot": "../../cloudfunctions",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "postcss": true,
+    "minified": false
+  },
+  "description": "Copy to project.private.config.json locally if you want a private WeChat DevTools config file."
+}

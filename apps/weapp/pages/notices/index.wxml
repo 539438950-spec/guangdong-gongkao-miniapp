@@ -1,0 +1,91 @@
+<view class="page">
+  <view class="card">
+    <view class="section-title">考试范围</view>
+    <view class="tag-row">
+      <block wx:for="{{examFilters}}" wx:key="id">
+        <view class="tag {{activeExamFilterId === item.id ? 'tag-active' : ''}}" data-id="{{item.id}}" bindtap="changeExamFilter">{{item.label}}</view>
+      </block>
+    </view>
+    <view class="section-title" style="margin-top: 20rpx;">公告阶段</view>
+    <view class="tag-row">
+      <block wx:for="{{stageFilters}}" wx:key="id">
+        <view class="tag {{activeStageFilterId === item.id ? 'tag-active' : ''}}" data-id="{{item.id}}" bindtap="changeStageFilter">{{item.label}}</view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">公告列表</view>
+    <view wx:if="{{noticesSummary.active}}">
+      <view class="item-title">{{noticesSummary.headline}}</view>
+      <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{noticesSummary.tags.length}}">
+        <block wx:for="{{noticesSummary.tags}}" wx:key="*this">
+          <view class="tag">{{item}}</view>
+        </block>
+      </view>
+      <view class="muted" style="margin-top: 8rpx;" wx:if="{{noticesSummary.detail}}">
+        {{noticesSummary.detail}}
+      </view>
+    </view>
+    <block wx:for="{{notices}}" wx:key="id">
+      <view class="list-item" data-id="{{item.id}}" bindtap="openNotice">
+        <view class="item-title">{{item.title}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view class="tag {{item.sourceMode === 'demo' ? 'tag-warn' : ''}}">{{item.sourceModeLabel}}</view>
+          <view class="tag">{{item.area}}</view>
+          <view class="tag">{{item.noticeStageLabel}}</view>
+          <view class="tag {{item.availabilityTagClass}}">{{item.availabilityLabel}}</view>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.noticePriorityLabel}}">
+          <view class="tag {{item.noticePriorityTagClass}}">{{item.noticePriorityLabel}}</view>
+        </view>
+        <view class="muted">{{item.area}} · {{item.publishedAt}} · {{item.registrationWindow}}</view>
+        <view class="muted">{{item.source}}</view>
+        <trust-card
+          wx:if="{{item.noticeTrust}}"
+          trust="{{item.noticeTrust}}"
+          action="{{item.trustAction}}"
+          showCard="{{false}}"
+          showTitle="{{false}}"
+          showCoverage="{{false}}"
+          showWorkbook="{{false}}"
+          showFetch="{{false}}"
+          showPublish="{{false}}"
+          showRun="{{false}}"
+          showPublishDetail="{{false}}"
+          showRiskSummary="{{false}}"
+          bind:actiontap="openTrustRoute"
+        />
+        <view class="muted" wx:if="{{item.noticePriorityDetail}}">{{item.noticePriorityDetail}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.noticeNextAction.label}}">
+          <view class="tag {{item.noticeActionTagClass}}">下一步</view>
+          <view class="tag">{{item.noticeNextAction.label}}</view>
+        </view>
+        <view class="muted" wx:if="{{item.noticeNextActionSummary}}">{{item.noticeNextActionSummary}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.noticeCompareSuggestion.actionLabel}}">
+          <view class="tag {{item.noticeCompareTagClass}}">对比建议</view>
+          <view class="tag">{{item.noticeCompareSuggestion.actionLabel}}</view>
+          <view class="tag" wx:if="{{item.noticeCompareSuggestion.groupName}}">{{item.noticeCompareSuggestion.groupName}}</view>
+        </view>
+        <view class="muted" wx:if="{{item.noticeCompareSuggestion.hint}}">{{item.noticeCompareSuggestion.hint}}</view>
+        <view class="muted" wx:if="{{item.noticeProgressHint}}">{{item.noticeProgressHint}}</view>
+        <view class="muted" wx:if="{{item.noticeProgressDetail}}">{{item.noticeProgressDetail}}</view>
+        <view class="muted" wx:if="{{item.sourceModeNote}}">{{item.sourceModeNote}}</view>
+        <view class="muted" wx:if="{{!item.hasStructuredPositions}}">当前仅提供公告信息，岗位对比和推荐将在结构化完成后开放。</view>
+        <view
+          class="button"
+          style="margin-top: 20rpx;"
+          wx:if="{{item.noticeCompareSuggestion.actionLabel}}"
+          data-id="{{item.id}}"
+          catchtap="handleCompareAction"
+        >
+          {{item.noticeCompareSuggestion.actionLabel}}
+        </view>
+        <view class="muted">{{item.summary}}</view>
+      </view>
+    </block>
+    <view class="empty-state" wx:if="{{!notices.length}}">
+      <view class="muted">当前筛选条件下没有公告。</view>
+    </view>
+  </view>
+</view>

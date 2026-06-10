@@ -1,0 +1,15 @@
+{
+  "sourceId": "ggfw-hrss-gd",
+  "sourceName": "广东省公务员考试录用管理系统",
+  "createdAt": "2026-06-10T01:34:02.407Z",
+  "severity": "medium",
+  "type": "structure-change",
+  "summary": "广东省公务员考试录用管理系统 页面结构发生变化",
+  "details": "来源结构发生变化：5a9d95bd -> bbcdc040",
+  "dedupeKey": "ggfw-hrss-gd:structure-change:bbcdc040e2d80383d0669a7f9ec63d5ff8aa41e2",
+  "cooldownMinutes": 720,
+  "status": "active",
+  "closedAt": "",
+  "updatedAt": "2026-06-10T01:34:02.407Z",
+  "id": "alert-1781055261293-6"
+}

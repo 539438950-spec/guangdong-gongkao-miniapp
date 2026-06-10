@@ -1,0 +1,13 @@
+{
+  "sourceId": "rsks-gd",
+  "reason": [
+    "fetch failed"
+  ],
+  "rawPayload": null,
+  "id": "rsks-gd-1780929011153",
+  "createdAt": "2026-06-08T14:30:11.153Z",
+  "status": "resolved",
+  "resolutionNote": "自动关闭：后续已有稳定成功版本，判定为历史瞬时错误。",
+  "resolvedAt": "2026-06-10T01:21:31.048Z",
+  "updatedAt": "2026-06-10T01:21:31.048Z"
+}

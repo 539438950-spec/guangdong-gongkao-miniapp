@@ -1,0 +1,18 @@
+{
+  "createdAt": "2026-06-10T01:34:14.192Z",
+  "sourceId": "rsks-gd",
+  "sourceName": "广东人事考试网",
+  "eventType": "publish",
+  "summary": "Published candidate snapshot",
+  "detail": "candidate=2026-06-10 01:34 候选版本 | stable=2026-06-10 01:34 稳定快照",
+  "releaseMode": "positions-open",
+  "releaseOverrideMode": "",
+  "reason": "",
+  "candidateVersionId": "rsks-gd@2026-06-10T01:34:14.192Z",
+  "candidateVersionLabel": "2026-06-10 01:34 候选版本",
+  "stableVersionId": "rsks-gd@2026-06-10T01:34:13.291Z",
+  "stableVersionLabel": "2026-06-10 01:34 稳定快照",
+  "id": "publish-audit-1781055254219-7",
+  "updatedAt": "2026-06-10T01:34:14.192Z",
+  "operator": ""
+}

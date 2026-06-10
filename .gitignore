@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+Thumbs.db
+*.log
+tmp/
+.tmp/
+.idea/
+.vscode/
+miniprogram_npm/
+apps/weapp/env.local.js
+cloudfunctions/gongkao-api/runtime/
+cloudfunctions/gongkao-api/services/api/var/

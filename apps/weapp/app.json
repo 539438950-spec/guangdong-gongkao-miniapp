@@ -1,0 +1,25 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/source-status/index",
+    "pages/review-center/index",
+    "pages/messages/index",
+    "pages/notices/index",
+    "pages/notice-detail/index",
+    "pages/positions/index",
+    "pages/compare/index",
+    "pages/profile/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "\u5e7f\u4e1c\u516c\u8003",
+    "navigationBarBackgroundColor": "#0d3b66",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f3f6fb",
+    "backgroundTextStyle": "light"
+  },
+  "usingComponents": {
+    "trust-card": "/components/trust-card/index"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

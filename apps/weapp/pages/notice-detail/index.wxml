@@ -1,0 +1,169 @@
+<view class="page" wx:if="{{notice}}">
+  <view class="hero">
+    <view class="section-title">{{notice.title}}</view>
+    <view>{{notice.source}} · {{notice.publishedAt}}</view>
+    <view style="margin-top: 16rpx;">{{notice.summary}}</view>
+  </view>
+
+  <view class="card" wx:if="{{mergedSourceEntries.length}}">
+    <view class="section-title">聚合来源</view>
+    <view class="muted" wx:if="{{mergedSourceSummary}}">{{mergedSourceSummary}}</view>
+    <view
+      wx:for="{{mergedSourceEntries}}"
+      wx:key="noticeId"
+      class="list-item"
+      style="margin-top: 16rpx;"
+    >
+      <view class="tag-row">
+        <view class="tag {{item.isPrimary ? 'tag-active' : ''}}">{{item.sourceName || item.sourceId}}</view>
+        <view class="tag" wx:if="{{item.publishedAt}}">{{item.publishedAt}}</view>
+        <view class="tag {{item.isPositionSource ? 'tag-active' : ''}}">{{item.roleLabel}}</view>
+        <view class="tag" wx:if="{{item.isPrimary}}">当前展示</view>
+      </view>
+      <view class="muted" style="margin-top: 8rpx;">{{item.summary}}</view>
+      <view class="muted" style="margin-top: 8rpx;">{{item.roleDetail}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">公告概览</view>
+    <view class="tag-row">
+      <view class="tag {{notice.sourceMode === 'demo' ? 'tag-warn' : ''}}">{{sourceModeLabel}}</view>
+      <view class="tag">{{notice.area}}</view>
+      <view class="tag">{{notice.noticeStageLabel || '公告'}}</view>
+      <view class="tag {{canViewPositions ? '' : 'tag-warn'}}">{{canViewPositions ? '可选岗' : '仅公告'}}</view>
+    </view>
+    <view class="muted" style="margin-top: 12rpx;">岗位数：{{notice.positionCount || 0}}</view>
+    <view class="muted" style="margin-top: 12rpx;" wx:if="{{availabilitySummary}}">{{availabilitySummary}}</view>
+    <view class="muted" wx:if="{{notice.attachments && notice.attachments.length}}">附件：{{notice.attachments[0]}}</view>
+  </view>
+
+  <view class="card" wx:if="{{noticeNextAction && noticeNextAction.label}}">
+    <view class="section-title">当前建议</view>
+    <view class="tag-row">
+      <view class="tag {{noticeNextAction.tone === 'warn' ? 'tag-warn' : (noticeNextAction.tone === 'ok' ? 'tag-active' : '')}}">{{noticeNextAction.label}}</view>
+      <view class="tag" wx:for="{{noticeNextAction.tags}}" wx:key="*this">{{item}}</view>
+    </view>
+    <view class="muted" style="margin-top: 12rpx;" wx:if="{{noticeNextActionSummary}}">{{noticeNextActionSummary}}</view>
+  </view>
+
+  <view class="card" wx:if="{{decisionPriority.label}}">
+    <view class="section-title">处理优先级</view>
+    <view class="tag-row">
+      <view class="tag tag-active">{{decisionPriority.label}}</view>
+      <view class="tag" wx:for="{{decisionPriority.tags}}" wx:key="*this">{{item}}</view>
+    </view>
+    <view class="muted" style="margin-top: 12rpx;" wx:if="{{decisionPriority.summary}}">
+      {{decisionPriority.summary}}
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{noticeCompareSuggestion && noticeCompareSuggestion.mode}}">
+    <view class="section-title">对比方案建议</view>
+    <view class="tag-row">
+      <view class="tag {{noticeCompareSuggestion.mode === 'review-needed' ? 'tag-warn' : 'tag-active'}}">
+        {{noticeCompareSuggestion.actionLabel || '岗位对比'}}
+      </view>
+      <view class="tag" wx:if="{{noticeCompareSuggestion.groupName}}">{{noticeCompareSuggestion.groupName}}</view>
+      <view class="tag" wx:if="{{noticeCompareSuggestion.candidateCount}}">
+        {{noticeCompareSuggestion.candidateCount}} 岗
+      </view>
+    </view>
+    <view class="muted" style="margin-top: 12rpx;" wx:if="{{noticeCompareSuggestion.hint}}">
+      {{noticeCompareSuggestion.hint}}
+    </view>
+  </view>
+
+  <trust-card
+    wx:if="{{noticeTrust}}"
+    title="数据可信度"
+    trust="{{noticeTrust}}"
+    badgeClass="{{trustBadgeClass}}"
+    action="{{trustAction}}"
+    bind:actiontap="openTrustRoute"
+  />
+
+  <view class="card">
+    <view class="section-title">关键时间</view>
+    <view class="row-label">报名时间</view>
+    <view>{{notice.registrationWindow}}</view>
+    <view class="row-label">笔试时间</view>
+    <view>{{notice.writtenExamAt}}</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">同批公告进度</view>
+    <view class="muted" wx:if="{{noticeBatch}}">{{noticeBatch.label}}</view>
+    <view wx:if="{{noticeTimeline.length}}">
+      <view
+        wx:for="{{noticeTimeline}}"
+        wx:key="id"
+        class="card"
+        style="margin-top: 20rpx;"
+        bindtap="openRelatedNotice"
+        data-id="{{item.id}}"
+      >
+        <view class="tag-row">
+          <view class="tag {{item.isCurrent ? '' : 'tag-warn'}}">{{item.noticeStageLabel || '公告'}}</view>
+          <view class="tag">{{item.publishedAt}}</view>
+          <view class="tag" wx:if="{{item.isCurrent}}">当前</view>
+        </view>
+        <view style="margin-top: 12rpx;">{{item.title}}</view>
+        <view class="muted" style="margin-top: 12rpx;">
+          {{item.hasStructuredPositions ? '已开放岗位查看与对比' : '当前仅开放公告查看'}}
+        </view>
+      </view>
+    </view>
+    <view class="muted" style="margin-top: 20rpx;" wx:else>当前批次仅识别到这一条公告，后续节点会在官方发布后持续补齐。</view>
+  </view>
+
+  <view class="card" wx:if="{{progressReminderOptions.length && progressReminderSettings}}">
+    <view class="section-title">进度提醒偏好</view>
+    <view class="muted">收藏后，只影响当前公告所在批次的后续提醒。</view>
+    <view class="muted" style="margin-top: 12rpx;">未单独设置的其他收藏公告，继续使用全局提醒偏好。</view>
+    <view class="tag-row" style="margin-top: 16rpx;">
+      <view
+        wx:for="{{progressReminderOptions}}"
+        wx:key="id"
+        class="tag {{progressReminderSettings[item.id] ? 'tag-active' : 'tag-warn'}}"
+        data-id="{{item.id}}"
+        bindtap="toggleProgressReminderSetting"
+      >
+        {{item.label}}{{progressReminderSettings[item.id] ? '已开' : '已关'}}
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">后续动作</view>
+    <view class="button" bindtap="handlePrimaryAction" wx:if="{{noticeNextAction.primaryActionLabel}}">
+      {{noticeNextAction.primaryActionLabel}}
+    </view>
+    <view
+      class="button"
+      style="margin-top: 20rpx;"
+      bindtap="handleCompareAction"
+      wx:if="{{noticeCompareSuggestion && noticeCompareSuggestion.actionLabel}}"
+    >
+      {{noticeCompareSuggestion.actionLabel}}
+    </view>
+    <view class="button secondary" bindtap="toggleFavorite">
+      {{favorite ? '取消收藏公告' : '收藏公告'}}
+    </view>
+    <view
+      class="button"
+      style="margin-top: 20rpx;"
+      bindtap="goToPositions"
+      wx:if="{{canViewPositions && (!noticeNextAction.primaryActionType || noticeNextAction.primaryActionType !== 'positions')}}"
+    >
+      查看岗位列表
+    </view>
+    <view class="muted" style="margin-top: 20rpx;" wx:if="{{secondaryActionLabel}}">{{secondaryActionLabel}}</view>
+    <view class="muted" style="margin-top: 20rpx;" wx:if="{{!canViewPositions}}">岗位表尚未结构化，当前仅展示公告与附件信息。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">官方原文</view>
+    <view class="muted">{{notice.url}}</view>
+  </view>
+</view>

@@ -1,0 +1,15 @@
+{
+  "sourceId": "rsks-gd",
+  "sourceName": "广东人事考试网",
+  "createdAt": "2026-06-08T22:30:10.714Z",
+  "severity": "medium",
+  "type": "review-queued",
+  "summary": "广东人事考试网 有待复核记录",
+  "details": "当前待复核 11 条。",
+  "dedupeKey": "rsks-gd:review-queued:11",
+  "cooldownMinutes": 30,
+  "status": "resolved",
+  "closedAt": "2026-06-10T01:21:31.219Z",
+  "updatedAt": "2026-06-10T01:21:31.219Z",
+  "id": "alert-1780957815127-4"
+}
