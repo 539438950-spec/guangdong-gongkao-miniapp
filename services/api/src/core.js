@@ -3,6 +3,12 @@ const path = require("node:path");
 
 const handlers = require("../../../apps/weapp/utils/api-handlers");
 const store = require("../../../apps/weapp/utils/store");
+const {
+  baselineSeedPaths,
+  ensureLocalRuntimeSeed,
+  localRuntimePaths
+} = require("../../runtime-paths");
+const { buildDemoPage, buildDemoPageData } = require("./demo-page");
 const { applyReviewAction, resolveStaleReviewItems } = require("../../ingest/src/review-actions");
 const {
   listPositionOverrides,
@@ -13,6 +19,12 @@ const {
   setSourceReleaseOverride,
   listPublishAudits
 } = require("../../ingest/src/release-actions");
+const seedSnapshotCache = new Map();
+let activeRuntimeState = {
+  runtimeKey: "",
+  seedVersion: "",
+  userStateVersion: -1
+};
 
 const READ_ACTIONS = new Set([
   "listNotices",
@@ -49,13 +61,11 @@ const REMOTE_ONLY_ACTIONS = new Set([
 ]);
 
 function defaultPaths() {
-  return {
-    userStateFile: path.resolve(__dirname, "../var/user-state.json"),
-    snapshotTarget: path.resolve(__dirname, "../../../apps/weapp/data/ingested.js"),
-    ingestStoreRoot: path.resolve(__dirname, "../../ingest/var"),
-    positionOverridePath: path.resolve(__dirname, "../../ingest/var/position-overrides.json"),
-    demoSnapshotTarget: path.resolve(__dirname, "../../../apps/weapp/data/demo.js")
-  };
+  return localRuntimePaths();
+}
+
+function packagedBaselinePaths() {
+  return baselineSeedPaths();
 }
 
 function createJsonHeaders(extraHeaders = {}) {
@@ -68,11 +78,68 @@ function createJsonHeaders(extraHeaders = {}) {
   };
 }
 
+function createHtmlHeaders(extraHeaders = {}) {
+  return {
+    "content-type": "text/html; charset=utf-8",
+    "access-control-allow-origin": "*",
+    ...extraHeaders
+  };
+}
+
 function loadUserState(filePath) {
   if (!fs.existsSync(filePath)) {
     return {};
   }
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function getFileVersion(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    return Number(stat.mtimeMs || 0);
+  } catch (_error) {
+    return 0;
+  }
+}
+
+function buildSeedSnapshotCacheKey(ingestedPath, demoPath) {
+  return `${ingestedPath}::${demoPath}`;
+}
+
+function loadSeedSnapshotModules(ingestedPath, demoPath) {
+  const cacheEntryKey = buildSeedSnapshotCacheKey(ingestedPath, demoPath);
+  const versionKey = `${getFileVersion(ingestedPath)}:${getFileVersion(demoPath)}`;
+  const cached = seedSnapshotCache.get(cacheEntryKey);
+  if (cached && cached.versionKey === versionKey) {
+    return cached.snapshot;
+  }
+
+  let ingested = null;
+  let demo = null;
+
+  if (fs.existsSync(ingestedPath)) {
+    delete require.cache[require.resolve(ingestedPath)];
+    ingested = require(ingestedPath);
+  }
+  if (fs.existsSync(demoPath)) {
+    delete require.cache[require.resolve(demoPath)];
+    demo = require(demoPath);
+  }
+
+  const seed = ingested && ingested.notices && ingested.notices.length ? ingested : (demo || ingested);
+  if (!seed) {
+    throw new Error(`seed snapshot not found: ${ingestedPath}`);
+  }
+  const snapshot = {
+    seed,
+    seedVersion: seed.updatedAt || "demo"
+  };
+
+  seedSnapshotCache.set(cacheEntryKey, {
+    versionKey,
+    snapshot
+  });
+  return snapshot;
 }
 
 function persistUserState(filePath) {
@@ -91,28 +158,26 @@ function createSeedSnapshotLoader(options) {
   return () => {
     const ingestedPath = options.snapshotTarget || defaultPaths().snapshotTarget;
     const demoPath = options.demoSnapshotTarget || defaultPaths().demoSnapshotTarget;
-
-    delete require.cache[require.resolve(ingestedPath)];
-    delete require.cache[require.resolve(demoPath)];
-
-    const ingested = require(ingestedPath);
-    const demo = require(demoPath);
-    const seed = ingested.notices && ingested.notices.length ? ingested : demo;
-    return {
-      seed,
-      seedVersion: seed.updatedAt || "demo"
-    };
+    return loadSeedSnapshotModules(ingestedPath, demoPath);
   };
 }
 
 function normalizeOptions(options = {}) {
   const defaults = defaultPaths();
+  const shouldBootstrapLocalRuntime = [
+    "userStateFile",
+    "snapshotTarget",
+    "ingestStoreRoot",
+    "positionOverridePath",
+    "demoSnapshotTarget"
+  ].every((key) => !options[key] || options[key] === defaults[key]);
+  const runtimeDefaults = shouldBootstrapLocalRuntime ? ensureLocalRuntimeSeed(defaults) : defaults;
   return {
-    userStateFile: options.userStateFile || defaults.userStateFile,
-    snapshotTarget: options.snapshotTarget || defaults.snapshotTarget,
-    ingestStoreRoot: options.ingestStoreRoot || defaults.ingestStoreRoot,
-    positionOverridePath: options.positionOverridePath || defaults.positionOverridePath,
-    demoSnapshotTarget: options.demoSnapshotTarget || defaults.demoSnapshotTarget,
+    userStateFile: options.userStateFile || runtimeDefaults.userStateFile,
+    snapshotTarget: options.snapshotTarget || runtimeDefaults.snapshotTarget,
+    ingestStoreRoot: options.ingestStoreRoot || runtimeDefaults.ingestStoreRoot,
+    positionOverridePath: options.positionOverridePath || runtimeDefaults.positionOverridePath,
+    demoSnapshotTarget: options.demoSnapshotTarget || runtimeDefaults.demoSnapshotTarget,
     routeBasePath: String(options.routeBasePath || "").trim()
   };
 }
@@ -134,6 +199,50 @@ function normalizeRoutePath(pathname, routeBasePath) {
   }
 
   return normalizedPath;
+}
+
+function buildRuntimeStateKey(options) {
+  return [
+    options.snapshotTarget || "",
+    options.demoSnapshotTarget || "",
+    options.userStateFile || ""
+  ].join("::");
+}
+
+function syncRuntimeState(options) {
+  const seedLoader = createSeedSnapshotLoader(options);
+  const snapshot = seedLoader();
+  const runtimeKey = buildRuntimeStateKey(options);
+  const userStateVersion = getFileVersion(options.userStateFile);
+  const shouldRefreshSeedLoader = (
+    activeRuntimeState.runtimeKey !== runtimeKey ||
+    activeRuntimeState.seedVersion !== snapshot.seedVersion
+  );
+
+  if (shouldRefreshSeedLoader) {
+    store.__setSeedSnapshotLoaderForTests(seedLoader, {
+      rebuild: false
+    });
+  }
+
+  if (shouldRefreshSeedLoader || activeRuntimeState.userStateVersion !== userStateVersion) {
+    hydrateUserState(options.userStateFile);
+  }
+
+  activeRuntimeState = {
+    runtimeKey,
+    seedVersion: snapshot.seedVersion,
+    userStateVersion
+  };
+  return snapshot;
+}
+
+function syncRuntimeStateAfterPersist(options) {
+  activeRuntimeState = {
+    runtimeKey: buildRuntimeStateKey(options),
+    seedVersion: createSeedSnapshotLoader(options)().seedVersion,
+    userStateVersion: getFileVersion(options.userStateFile)
+  };
 }
 
 async function invokeAction(action, args, options) {
@@ -226,11 +335,11 @@ async function handleRpcBody(body, options) {
     };
   }
 
-  store.__setSeedSnapshotLoaderForTests(createSeedSnapshotLoader(options));
-  hydrateUserState(options.userStateFile);
+  syncRuntimeState(options);
   const data = await invokeAction(action, args, options);
   if (!READ_ACTIONS.has(action)) {
     persistUserState(options.userStateFile);
+    syncRuntimeStateAfterPersist(options);
   }
 
   return {
@@ -243,7 +352,7 @@ async function handleRpcBody(body, options) {
 }
 
 function buildHealthPayload(options) {
-  hydrateUserState(options.userStateFile);
+  syncRuntimeState(options);
   return {
     statusCode: 200,
     payload: {
@@ -253,6 +362,21 @@ function buildHealthPayload(options) {
         userStateFile: options.userStateFile
       }
     }
+  };
+}
+
+function buildDemoPayload(options) {
+  const seedLoader = createSeedSnapshotLoader(options);
+  const { seed } = seedLoader();
+  const userState = loadUserState(options.userStateFile);
+  const pageData = buildDemoPageData(seed, userState);
+
+  return {
+    statusCode: 200,
+    payload: buildDemoPage({
+      ...pageData,
+      baseUrl: options.baseUrl || ""
+    })
   };
 }
 
@@ -276,6 +400,14 @@ async function handleApiRequest(input, runtimeOptions = {}) {
       return {
         ...result,
         headers: createJsonHeaders()
+      };
+    }
+
+    if (method === "GET" && (pathname === "/demo" || pathname === "/")) {
+      const result = buildDemoPayload(options);
+      return {
+        ...result,
+        headers: createHtmlHeaders()
       };
     }
 
@@ -311,12 +443,15 @@ async function handleApiRequest(input, runtimeOptions = {}) {
 module.exports = {
   READ_ACTIONS,
   defaultPaths,
+  packagedBaselinePaths,
   createJsonHeaders,
+  createHtmlHeaders,
   loadUserState,
   persistUserState,
   hydrateUserState,
   createSeedSnapshotLoader,
   normalizeOptions,
   normalizeRoutePath,
+  buildDemoPayload,
   handleApiRequest
 };

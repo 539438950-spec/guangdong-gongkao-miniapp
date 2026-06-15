@@ -29,31 +29,21 @@ function createRequestHandler(options) {
         pathname: url.pathname,
         bodyText: Buffer.concat(chunks).toString("utf8")
       },
-      options
+      {
+        ...options,
+        baseUrl: `${url.protocol}//${url.host}`
+      }
     );
 
     response.writeHead(result.statusCode, {
       ...createJsonHeaders({ connection: "close" }),
       ...result.headers
     });
-    response.end(`${JSON.stringify(result.payload)}\n`);
+    response.end(serializeResponsePayload(result));
   };
 }
 
-async function startApiServer(options = {}) {
-  const paths = defaultPaths();
-  const port = Number(
-    options.port !== undefined
-      ? options.port
-      : (process.env.GONGKAO_API_PORT || 3100)
-  );
-  const runtimeOptions = normalizeOptions({
-    userStateFile: options.userStateFile || paths.userStateFile,
-    snapshotTarget: options.snapshotTarget || paths.snapshotTarget,
-    ingestStoreRoot: options.ingestStoreRoot || paths.ingestStoreRoot,
-    positionOverridePath: options.positionOverridePath || paths.positionOverridePath,
-    demoSnapshotTarget: options.demoSnapshotTarget || paths.demoSnapshotTarget
-  });
+function createConfiguredServer(runtimeOptions) {
   const server = http.createServer(createRequestHandler(runtimeOptions));
   server[SERVER_SOCKETS] = new Set();
   server.removeAllListeners("request");
@@ -64,10 +54,63 @@ async function startApiServer(options = {}) {
       server[SERVER_SOCKETS].delete(socket);
     });
   });
+  return server;
+}
 
-  await new Promise((resolve) => {
-    server.listen(port, resolve);
+function listenServer(server, port) {
+  return new Promise((resolve, reject) => {
+    const handleListening = () => {
+      server.off("error", handleError);
+      resolve();
+    };
+    const handleError = (error) => {
+      server.off("listening", handleListening);
+      reject(error);
+    };
+    server.once("listening", handleListening);
+    server.once("error", handleError);
+    server.listen(port);
   });
+}
+
+function serializeResponsePayload(result) {
+  const headers = result && result.headers ? result.headers : {};
+  const contentType = String(headers["content-type"] || headers["Content-Type"] || "");
+  if (contentType.includes("text/html")) {
+    return String(result.payload || "");
+  }
+  return `${JSON.stringify(result.payload)}\n`;
+}
+
+async function startApiServer(options = {}) {
+  const paths = defaultPaths();
+  const requestedPort = Number(
+    options.port !== undefined
+      ? options.port
+      : (process.env.GONGKAO_API_PORT || 3100)
+  );
+  const allowPortFallback = Boolean(options.allowPortFallback);
+  const runtimeOptions = normalizeOptions({
+    userStateFile: options.userStateFile || paths.userStateFile,
+    snapshotTarget: options.snapshotTarget || paths.snapshotTarget,
+    ingestStoreRoot: options.ingestStoreRoot || paths.ingestStoreRoot,
+    positionOverridePath: options.positionOverridePath || paths.positionOverridePath,
+    demoSnapshotTarget: options.demoSnapshotTarget || paths.demoSnapshotTarget
+  });
+  let server = createConfiguredServer(runtimeOptions);
+  let usedPort = requestedPort;
+
+  try {
+    await listenServer(server, usedPort);
+  } catch (error) {
+    if (!allowPortFallback || usedPort === 0 || !error || error.code !== "EADDRINUSE") {
+      throw error;
+    }
+    server.removeAllListeners();
+    usedPort = 0;
+    server = createConfiguredServer(runtimeOptions);
+    await listenServer(server, usedPort);
+  }
   if (typeof server.unref === "function") {
     server.unref();
   }
@@ -75,9 +118,11 @@ async function startApiServer(options = {}) {
   return {
     server,
     port: server.address().port,
+    requestedPort,
     userStateFile: runtimeOptions.userStateFile,
     snapshotTarget: runtimeOptions.snapshotTarget,
-    ingestStoreRoot: runtimeOptions.ingestStoreRoot
+    ingestStoreRoot: runtimeOptions.ingestStoreRoot,
+    positionOverridePath: runtimeOptions.positionOverridePath
   };
 }
 
@@ -130,12 +175,16 @@ async function main() {
     : defaults.userStateFile;
   const instance = await startApiServer({
     port,
+    allowPortFallback: portArg === "",
     userStateFile,
     snapshotTarget,
     ingestStoreRoot,
     positionOverridePath
   });
 
+  if (Number(instance.requestedPort) > 0 && Number(instance.port) !== Number(instance.requestedPort)) {
+    console.log(`[api] requested port ${instance.requestedPort} was busy, fell back to ${instance.port}`);
+  }
   console.log(`[api] listening on http://127.0.0.1:${instance.port}`);
   console.log(`[api] user state file: ${instance.userStateFile}`);
   console.log(`[api] snapshot target: ${instance.snapshotTarget}`);

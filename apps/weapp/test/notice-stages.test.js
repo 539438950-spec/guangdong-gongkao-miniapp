@@ -3,6 +3,11 @@ const assert = require("node:assert/strict");
 
 const handlers = require("../utils/api-handlers");
 const store = require("../utils/store");
+const { installTestSeed } = require("./fixtures/test-seed");
+
+test.beforeEach(() => {
+  installTestSeed(store, "notice-stage-test-seed");
+});
 
 test.afterEach(() => {
   store.__resetStateForTests();

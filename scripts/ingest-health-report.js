@@ -2,15 +2,17 @@
 
 const path = require("node:path");
 
+const { ensureLocalRuntimeSeed, localRuntimePaths } = require("../services/runtime-paths");
 const { FileStore } = require("../services/ingest/src/storage/file-store");
 const { buildIngestHealthReport } = require("../services/ingest/src/health-report");
 
 function parseArgs(argv) {
+  const runtimeDefaults = localRuntimePaths();
   const result = {
     json: false,
     sourceId: "",
     auditLimit: 5,
-    storeRoot: path.resolve(__dirname, "../services/ingest/var")
+    storeRoot: runtimeDefaults.ingestStoreRoot
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -73,6 +75,9 @@ function printTextReport(report) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  ensureLocalRuntimeSeed({
+    ingestStoreRoot: args.storeRoot
+  });
   const store = new FileStore(args.storeRoot);
   const report = buildIngestHealthReport(store, {
     sourceId: args.sourceId,

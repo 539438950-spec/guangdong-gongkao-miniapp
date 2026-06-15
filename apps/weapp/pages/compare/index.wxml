@@ -1,4 +1,25 @@
-<view class="page" wx:if="{{group}}">
+<view class="page">
+  <view class="card" wx:if="{{pageState === 'loading'}}">
+    <view class="section-title">岗位对比</view>
+    <view class="muted">{{pageStatusMessage || '正在加载岗位对比方案...'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'error'}}">
+    <view class="section-title">岗位对比</view>
+    <view class="muted">{{pageStatusMessage || '加载岗位对比失败'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'empty'}}">
+    <view class="section-title">岗位对比</view>
+    <view class="muted">{{pageStatusMessage || '当前还没有可用的对比方案，请先从岗位列表加入岗位。'}}</view>
+  </view>
+
+  <block wx:elif="{{pageState === 'content' || pageState === 'degraded'}}">
+  <view class="card" wx:if="{{pageState === 'degraded' && pageStatusMessage}}">
+    <view class="section-title">状态提醒</view>
+    <view class="muted">{{pageStatusMessage}}</view>
+  </view>
+
   <view class="hero">
     <view class="section-title">岗位对比</view>
     <view>{{group.name}} · {{positions.length}} 个岗位</view>
@@ -108,6 +129,81 @@
     </view>
   </view>
 
+  <view class="card" wx:if="{{triageSummary.active}}">
+    <view class="section-title">方案分层建议</view>
+    <view class="item-title">{{triageSummary.headline}}</view>
+    <view class="muted" style="margin-top: 8rpx;">{{triageSummary.detail}}</view>
+    <view class="tag-row" style="margin-top: 12rpx;">
+      <view class="tag">优先跟进 {{triageSummary.followUpCount}}</view>
+      <view class="tag">待核对 {{triageSummary.verifyCount}}</view>
+      <view class="tag" wx:if="{{triageSummary.verifyCorrectionCount}}">人工纠错 {{triageSummary.verifyCorrectionCount}}</view>
+      <view class="tag" wx:if="{{triageSummary.verifyTrustCount}}">可信度 {{triageSummary.verifyTrustCount}}</view>
+      <view class="tag tag-warn">可移除 {{triageSummary.removeCount}}</view>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{triageSummary.followUpItems.length}}">
+      <view class="filter-label">优先跟进</view>
+      <block wx:for="{{triageSummary.followUpItems}}" wx:key="id">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.title}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{triageSummary.verifyItems.length}}">
+      <view class="filter-label">待核对</view>
+      <view style="margin-top: 12rpx;" wx:if="{{triageSummary.verifyCorrectionItems.length}}">
+        <view class="muted">人工纠错导致待核对</view>
+        <block wx:for="{{triageSummary.verifyCorrectionItems}}" wx:key="id">
+          <view class="compare-summary-row">
+            <view class="compare-summary-label">{{item.title}}</view>
+            <view class="compare-summary-value">{{item.summary}}</view>
+          </view>
+          <view class="tag-row" style="margin-top: 8rpx;" wx:if="{{item.noticeId}}">
+            <view class="button secondary compact-button" data-notice-id="{{item.noticeId}}" bindtap="openPositions">{{item.actionLabel || '回原岗位页'}}</view>
+          </view>
+        </block>
+      </view>
+      <view style="margin-top: 12rpx;" wx:if="{{triageSummary.verifyTrustItems.length}}">
+        <view class="muted">结构化可信度导致待核对</view>
+        <block wx:for="{{triageSummary.verifyTrustItems}}" wx:key="id">
+          <view class="compare-summary-row">
+            <view class="compare-summary-label">{{item.title}}</view>
+            <view class="compare-summary-value">{{item.summary}}</view>
+          </view>
+          <view class="tag-row" style="margin-top: 8rpx;" wx:if="{{item.actionRoute}}">
+            <view class="button secondary compact-button" data-route="{{item.actionRoute}}" bindtap="openTrustRoute">{{item.actionLabel || '查看当前卡点'}}</view>
+          </view>
+        </block>
+      </view>
+      <view style="margin-top: 12rpx;" wx:if="{{triageSummary.verifyOtherItems.length}}">
+        <view class="muted">其他待核对</view>
+        <block wx:for="{{triageSummary.verifyOtherItems}}" wx:key="id">
+          <view class="compare-summary-row">
+            <view class="compare-summary-label">{{item.title}}</view>
+            <view class="compare-summary-value">{{item.summary}}</view>
+          </view>
+        </block>
+      </view>
+      <block wx:if="{{!triageSummary.verifyCorrectionItems.length && !triageSummary.verifyTrustItems.length && !triageSummary.verifyOtherItems.length}}">
+      <block wx:for="{{triageSummary.verifyItems}}" wx:key="id">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.title}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+      </block>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{triageSummary.removeItems.length}}">
+      <view class="filter-label">可移除</view>
+      <block wx:for="{{triageSummary.removeItems}}" wx:key="id">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.title}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
   <view class="card" wx:if="{{positions.length}}">
     <view class="section-title">个人条件匹配</view>
     <view class="muted" wx:if="{{eligibilitySummary.active}}">{{eligibilitySummary.profileSummary}}</view>
@@ -153,6 +249,32 @@
       <view class="button secondary compact-button" bindtap="openProfile">
         {{eligibilitySummary.active ? '修改个人条件' : '去填写个人条件'}}
       </view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{correctionImpactSummary.active}}">
+    <view class="section-title">人工纠错影响</view>
+    <view class="item-title">{{correctionImpactSummary.headline}}</view>
+    <view class="muted" style="margin-top: 8rpx;" wx:if="{{correctionImpactSummary.detail}}">
+      {{correctionImpactSummary.detail}}
+    </view>
+    <view class="tag-row" style="margin-top: 12rpx;">
+      <view class="tag">人工纠错 {{correctionImpactSummary.correctedPositionCount}}</view>
+      <view class="tag" wx:if="{{correctionImpactSummary.barrierAffectedCount}}">门槛相关 {{correctionImpactSummary.barrierAffectedCount}}</view>
+      <view class="tag tag-warn" wx:if="{{correctionImpactSummary.mismatchAffectedCount}}">影响报考判断 {{correctionImpactSummary.mismatchAffectedCount}}</view>
+    </view>
+    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{correctionImpactSummary.topFields.length}}">
+      <block wx:for="{{correctionImpactSummary.topFields}}" wx:key="*this">
+        <view class="tag">{{item}}</view>
+      </block>
+    </view>
+    <view style="margin-top: 20rpx;" wx:if="{{correctionImpactSummary.items.length}}">
+      <block wx:for="{{correctionImpactSummary.items}}" wx:key="id">
+        <view class="compare-summary-row">
+          <view class="compare-summary-label">{{item.title}}</view>
+          <view class="compare-summary-value">{{item.summary}}</view>
+        </view>
+      </block>
     </view>
   </view>
 
@@ -203,8 +325,9 @@
             {{item.noticeStageLabel || '公告'}}<text wx:if="{{item.noticePublishedAt}}"> · {{item.noticePublishedAt}}</text>
           </view>
           <view class="tag-row" style="margin-top: 12rpx;">
-            <block wx:for="{{item.reasons}}" wx:key="*this">
-              <view class="tag">{{item}}</view>
+            <view class="tag" wx:if="{{item.matchReasonEntries.length}}">相似点</view>
+            <block wx:for="{{item.matchReasonEntries}}" wx:key="label" wx:for-item="reasonEntry">
+              <view class="tag">{{reasonEntry.label}}</view>
             </block>
             <view
               class="tag {{item.noticeTrust && (item.noticeTrust.parseQualityStatus === 'warning' || item.noticeTrust.parseQualityStatus === 'attachment-only') ? 'tag-warn' : ''}}"
@@ -212,6 +335,18 @@
             >
               {{item.noticeTrust.trustLabel}}
             </view>
+          </view>
+          <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.deltaReasonEntries.length}}">
+            <view class="tag">变化点</view>
+            <block wx:for="{{item.deltaReasonEntries}}" wx:key="label" wx:for-item="reasonEntry">
+              <view class="tag {{reasonEntry.tone === 'advantage' ? 'tag-active' : 'tag-warn'}}">{{reasonEntry.label}}</view>
+            </block>
+          </view>
+          <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.reviewReasonEntries.length}}">
+            <view class="tag tag-warn">待确认</view>
+            <block wx:for="{{item.reviewReasonEntries}}" wx:key="label" wx:for-item="reasonEntry">
+              <view class="tag tag-warn">{{reasonEntry.label}}</view>
+            </block>
           </view>
           <view class="muted" wx:if="{{item.profileHint}}" style="margin-top: 8rpx;">{{item.profileHint}}</view>
           <view class="muted" wx:if="{{item.reasonSummary}}" style="margin-top: 8rpx;">{{item.reasonSummary}}</view>
@@ -253,6 +388,7 @@
       <view class="tag {{sortMode === 'manual' ? 'tag-active' : ''}}" data-mode="manual" bindtap="changeSortMode">原顺序</view>
       <view class="tag {{sortMode === 'rule' ? 'tag-active' : ''}}" data-mode="rule" bindtap="changeSortMode">规则分优先</view>
       <view class="tag {{sortMode === 'eligibility' ? 'tag-active' : ''}}" data-mode="eligibility" bindtap="changeSortMode">个人匹配优先</view>
+      <view class="tag {{sortMode === 'trust' ? 'tag-active' : ''}}" data-mode="trust" bindtap="changeSortMode">数据可信优先</view>
     </view>
     <view class="filter-actions">
       <view class="button secondary compact-button" bindtap="saveGroupName">保存名称</view>
@@ -282,6 +418,9 @@
       </view>
       <view class="tag {{rowFocusMode === 'barrier' ? 'tag-active' : ''}}" data-mode="barrier" bindtap="changeRowFocusMode">
         只看门槛（{{rowFocusSummary.barrierCount}}<text wx:if="{{rowFocusSummary.mismatchCount}}"> · 不匹配 {{rowFocusSummary.mismatchCount}}</text>）
+      </view>
+      <view class="tag {{rowFocusMode === 'corrected' ? 'tag-active' : ''}}" data-mode="corrected" bindtap="changeRowFocusMode">
+        只看人工纠错（{{rowFocusSummary.correctedCount || 0}}）
       </view>
     </view>
     <view style="margin-top: 20rpx;" wx:if="{{differenceSummary.sharedFields.length}}">
@@ -331,6 +470,21 @@
           <view class="tag">{{item.ruleScoreLabel}}</view>
           <view class="tag tag-warn" wx:if="{{item.hasManualCorrections}}">已人工纠错</view>
         </view>
+        <view class="muted" style="margin-top: 8rpx;" wx:if="{{item.comparisonSummary.headline}}">
+          组内高亮：{{item.comparisonSummary.headline}}
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.comparisonSummary.advantageEntries.length}}">
+          <view class="tag tag-active">相对宽松</view>
+          <block wx:for="{{item.comparisonSummary.advantageEntries}}" wx:key="label" wx:for-item="reasonEntry">
+            <view class="tag">{{reasonEntry.label}}</view>
+          </block>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.comparisonSummary.pressureEntries.length}}">
+          <view class="tag tag-warn">相对更严</view>
+          <block wx:for="{{item.comparisonSummary.pressureEntries}}" wx:key="label" wx:for-item="reasonEntry">
+            <view class="tag tag-warn">{{reasonEntry.label}}</view>
+          </block>
+        </view>
         <view class="muted" style="margin-top: 8rpx;" wx:if="{{item.opportunityReasons.length}}">
           机会点：{{item.opportunityReasons.join('、')}}
         </view>
@@ -367,18 +521,16 @@
           <view class="button secondary compact-button" data-notice-id="{{item.noticeId}}" bindtap="openPositions">回到岗位页</view>
           <view class="button secondary compact-button" data-notice-id="{{item.noticeId}}" bindtap="openNoticeDetail">查看公告</view>
         </view>
-        <block wx:for="{{item.rows}}" wx:key="label">
-          <view class="row-label {{item.isMismatch ? 'compare-mismatch-label' : (item.isDifferent ? 'compare-diff-label' : '')}}">{{item.label}}</view>
-          <view class="row-value {{item.isMismatch ? 'compare-mismatch-value' : (item.isDifferent ? 'compare-diff-value' : '')}}">{{item.value}}</view>
+        <block wx:for="{{item.rows}}" wx:key="label" wx:for-item="row">
+          <view class="row-label {{row.isMismatch ? 'compare-mismatch-label' : (row.isDifferent ? 'compare-diff-label' : '')}}">{{row.label}}</view>
+          <view class="row-value {{row.isMismatch ? 'compare-mismatch-value' : (row.isDifferent ? 'compare-diff-value' : '')}}">{{row.value}}</view>
+          <view class="tag-row" style="margin-top: 8rpx;" wx:if="{{row.highlightLabel || row.isCorrected}}">
+            <view class="tag tag-warn" wx:if="{{row.isCorrected}}">人工纠错</view>
+            <view class="tag {{row.highlightTone === 'advantage' ? 'tag-active' : 'tag-warn'}}" wx:if="{{row.highlightLabel}}">{{row.highlightLabel}}</view>
+          </view>
         </block>
       </view>
     </block>
   </view>
-</view>
-
-<view class="page" wx:else>
-  <view class="card">
-    <view class="section-title">岗位对比</view>
-    <view class="muted">当前还没有可用的对比组，请先从岗位列表加入岗位。</view>
-  </view>
+  </block>
 </view>

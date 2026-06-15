@@ -1,4 +1,20 @@
 <view class="page">
+  <view class="card" wx:if="{{pageState === 'loading'}}">
+    <view class="section-title">复核中心</view>
+    <view class="muted">{{pageStatusMessage || '正在加载复核中心...'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'error'}}">
+    <view class="section-title">复核中心</view>
+    <view class="muted">{{pageStatusMessage || '加载复核中心失败'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'empty'}}">
+    <view class="section-title">复核中心</view>
+    <view class="muted">{{pageStatusMessage || '当前没有待复核记录、已处理记录或可操作纠错规则。'}}</view>
+  </view>
+
+  <block wx:elif="{{pageState === 'content' || pageState === 'degraded'}}">
   <view class="hero">
     <view class="section-title">复核中心</view>
     <view>查看抓取失败、校验失败和回退后进入人工复核的记录。</view>
@@ -6,8 +22,12 @@
     <view class="muted">配置来源：{{connectionSummary.sourceLabel}}</view>
     <view class="muted">{{connectionSummary.endpointLabel}}</view>
     <view class="muted" wx:if="{{connectionSummary.hint}}">{{connectionSummary.hint}}</view>
-    <view class="muted" wx:if="{{sourceName || reviewFocusLabel}}" style="margin-top: 12rpx;">
+    <view class="muted" wx:if="{{sourceName || reviewFocusLabel || reasonLabel}}" style="margin-top: 12rpx;">
       当前聚焦：{{sourceName || '全部来源'}}{{reviewFocusLabel ? ' · ' + reviewFocusLabel : ''}}
+    </view>
+    <view class="muted" wx:if="{{reasonLabel}}">当前原因筛选：{{reasonLabel}}</view>
+    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{reasonLabel}}">
+      <view class="button secondary compact-button" bindtap="clearReviewReason">清除原因筛选</view>
     </view>
     <view class="metrics" style="margin-top: 24rpx;">
       <view class="metric">
@@ -35,7 +55,54 @@
     <block wx:for="{{summary.failedCheckTypeSummary}}" wx:key="label" wx:for-item="checkItem">
       <view class="list-item">
         <view class="item-title">{{checkItem.label}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{checkItem.actionLabel}}">
+          <view class="button secondary compact-button" data-reason-key="{{checkItem.key}}" data-focus="{{checkItem.focus}}" bindtap="setReviewReason">{{checkItem.actionLabel}}</view>
+        </view>
         <view class="muted">涉及 {{checkItem.count}} 条复核记录</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="card" wx:if="{{reviewSourceSummaries && reviewSourceSummaries.length}}">
+    <view class="section-title">来源概览</view>
+    <view class="muted">按来源先看待复核、阻塞发布和历史积压数量，再决定先处理哪一个来源。</view>
+    <block wx:for="{{reviewSourceSummaries}}" wx:key="sourceId" wx:for-item="sourceItem">
+      <view class="list-item">
+        <view class="item-title">{{sourceItem.sourceName}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view class="tag">待复核 {{sourceItem.totalCount}}</view>
+          <view class="tag tag-warn" wx:if="{{sourceItem.blockingCount}}">阻塞 {{sourceItem.blockingCount}}</view>
+          <view class="tag" wx:if="{{sourceItem.staleCount}}">积压 {{sourceItem.staleCount}}</view>
+          <view class="tag" wx:if="{{sourceItem.highPriorityCount}}">高优 {{sourceItem.highPriorityCount}}</view>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view
+            class="button secondary compact-button"
+            data-source-id="{{sourceItem.sourceId}}"
+            data-focus=""
+            bindtap="setReviewSourceScope"
+          >
+            {{sourceItem.primaryActionLabel}}
+          </view>
+          <view
+            class="button secondary compact-button"
+            wx:if="{{sourceItem.blockingActionLabel}}"
+            data-source-id="{{sourceItem.sourceId}}"
+            data-focus="blocking"
+            bindtap="setReviewSourceScope"
+          >
+            {{sourceItem.blockingActionLabel}}
+          </view>
+          <view
+            class="button secondary compact-button"
+            wx:if="{{sourceItem.staleActionLabel}}"
+            data-source-id="{{sourceItem.sourceId}}"
+            data-focus="stale"
+            bindtap="setReviewSourceScope"
+          >
+            {{sourceItem.staleActionLabel}}
+          </view>
+        </view>
       </view>
     </block>
   </view>
@@ -86,6 +153,32 @@
   <view class="card">
     <view class="section-title">待复核列表</view>
     <view class="muted" wx:if="{{staleReviewHint}}">{{staleReviewHint}}</view>
+    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceName}}">
+      <view class="button secondary compact-button" bindtap="clearReviewSourceScope">返回全部来源</view>
+    </view>
+    <view class="tag-row" style="margin-top: 12rpx;">
+      <view
+        class="button {{reviewFilterSummary.activeFocus === '' ? '' : 'secondary'}} compact-button"
+        data-focus=""
+        bindtap="setReviewFocus"
+      >
+        全部复核 {{reviewFilterSummary.allCount}}
+      </view>
+      <view
+        class="button {{reviewFilterSummary.activeFocus === 'blocking' ? '' : 'secondary'}} compact-button"
+        data-focus="blocking"
+        bindtap="setReviewFocus"
+      >
+        阻塞发布 {{reviewFilterSummary.blockingCount}}
+      </view>
+      <view
+        class="button {{reviewFilterSummary.activeFocus === 'stale' ? '' : 'secondary'}} compact-button"
+        data-focus="stale"
+        bindtap="setReviewFocus"
+      >
+        历史积压 {{reviewFilterSummary.staleCount}}
+      </view>
+    </view>
     <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{staleReviewActionEnabled && staleReviewCount}}">
       <view class="tag tag-warn">历史积压 {{staleReviewCount}}</view>
       <view class="button secondary compact-button" bindtap="resolveStaleItems">
@@ -100,39 +193,51 @@
           <view class="tag tag-warn" wx:if="{{reviewItem.staleReview}}">历史积压</view>
         </view>
         <view class="muted">进入队列：{{reviewItem.createdAt || '暂无'}}</view>
-        <view class="muted">{{reviewItem.payloadStatusLabel}}</view>
-        <view class="muted" wx:if="{{reviewItem.candidateVersionLabel || reviewItem.candidateVersionId}}">
-          候选版本：{{reviewItem.candidateVersionLabel || reviewItem.candidateVersionId}}
-        </view>
-        <view class="muted" wx:if="{{reviewItem.rollbackToVersionLabel || reviewItem.rollbackToVersionId}}">
-          回退目标：{{reviewItem.rollbackToVersionLabel || reviewItem.rollbackToVersionId}}
-        </view>
-        <view class="muted" wx:if="{{reviewItem.gateCheckSummary && reviewItem.gateCheckSummary.summary}}">
-          闸门校验：{{reviewItem.gateCheckSummary.summary}}
-        </view>
-        <view class="muted" wx:if="{{reviewItem.gateChecks && reviewItem.gateChecks.length}}">
-          当前卡点：{{reviewItem.gateChecks[0].label}} · {{reviewItem.gateChecks[0].status}}{{reviewItem.gateChecks[0].detail ? ' · ' + reviewItem.gateChecks[0].detail : ''}}
-        </view>
         <view class="muted" wx:if="{{reviewItem.blockingRelease}}">
           当前会阻塞新版本发布，前台应继续保留上一稳定版本。
         </view>
-        <view class="muted" wx:if="{{reviewItem.noticeTitle}}">公告：{{reviewItem.noticeTitle}}</view>
-        <view class="muted" wx:if="{{reviewItem.noticePublishedAt}}">公告发布时间：{{reviewItem.noticePublishedAt}}</view>
-        <view class="muted" wx:if="{{reviewItem.parseStatus}}">解析状态：{{reviewItem.parseStatus}}</view>
-        <view class="muted" wx:if="{{reviewItem.fieldCoveragePercent}}">字段覆盖率：{{reviewItem.fieldCoveragePercent}}%</view>
-        <view class="muted" wx:if="{{reviewItem.rowsTotal}}">结构化岗位数：{{reviewItem.rowsTotal}}</view>
-        <view class="muted" wx:if="{{reviewItem.workbookSheetSummary}}">工作表摘要：{{reviewItem.workbookSheetSummary}}</view>
-        <block wx:for="{{reviewItem.reasons}}" wx:key="*this" wx:for-item="reasonItem">
-          <view class="muted" style="margin-top: 8rpx;">原因：{{reasonItem}}</view>
-        </block>
-        <block wx:for="{{reviewItem.detailLines}}" wx:key="*this" wx:for-item="detailItem">
-          <view class="muted" style="margin-top: 8rpx;">{{detailItem}}</view>
-        </block>
         <view class="muted" wx:if="{{reviewItem.releaseImpact}}" style="margin-top: 8rpx;">
           发布影响：{{reviewItem.releaseImpact}}
         </view>
         <view class="muted" wx:if="{{reviewItem.resolutionSuggestion}}">
           处理建议：{{reviewItem.resolutionSuggestion}}
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view
+            class="button secondary compact-button"
+            data-id="{{reviewItem.id}}"
+            data-section="pending"
+            bindtap="toggleReviewItemDetail"
+          >
+            {{reviewItemExpanded[reviewItem.id] ? '收起详情' : '展开详情'}}
+          </view>
+        </view>
+        <view wx:if="{{reviewItemExpanded[reviewItem.id]}}">
+          <view class="muted">{{reviewItem.payloadStatusLabel}}</view>
+          <view class="muted" wx:if="{{reviewItem.candidateVersionLabel || reviewItem.candidateVersionId}}">
+            候选版本：{{reviewItem.candidateVersionLabel || reviewItem.candidateVersionId}}
+          </view>
+          <view class="muted" wx:if="{{reviewItem.rollbackToVersionLabel || reviewItem.rollbackToVersionId}}">
+            回退目标：{{reviewItem.rollbackToVersionLabel || reviewItem.rollbackToVersionId}}
+          </view>
+          <view class="muted" wx:if="{{reviewItem.gateCheckSummary && reviewItem.gateCheckSummary.summary}}">
+            发布闸门：{{reviewItem.gateCheckSummary.summary}}
+          </view>
+          <view class="muted" wx:if="{{reviewItem.gateChecks && reviewItem.gateChecks.length}}">
+            当前卡点：{{reviewItem.gateChecks[0].label}} · {{reviewItem.gateChecks[0].status}}{{reviewItem.gateChecks[0].detail ? ' · ' + reviewItem.gateChecks[0].detail : ''}}
+          </view>
+          <view class="muted" wx:if="{{reviewItem.noticeTitle}}">公告：{{reviewItem.noticeTitle}}</view>
+          <view class="muted" wx:if="{{reviewItem.noticePublishedAt}}">公告发布时间：{{reviewItem.noticePublishedAt}}</view>
+          <view class="muted" wx:if="{{reviewItem.parseStatus}}">解析状态：{{reviewItem.parseStatus}}</view>
+          <view class="muted" wx:if="{{reviewItem.fieldCoveragePercent}}">字段覆盖率：{{reviewItem.fieldCoveragePercent}}%</view>
+          <view class="muted" wx:if="{{reviewItem.rowsTotal}}">结构化岗位数：{{reviewItem.rowsTotal}}</view>
+          <view class="muted" wx:if="{{reviewItem.workbookSheetSummary}}">工作表摘要：{{reviewItem.workbookSheetSummary}}</view>
+          <block wx:for="{{reviewItem.reasons}}" wx:key="*this" wx:for-item="reasonItem">
+            <view class="muted" style="margin-top: 8rpx;">原因：{{reasonItem}}</view>
+          </block>
+          <block wx:for="{{reviewItem.detailLines}}" wx:key="*this" wx:for-item="detailItem">
+            <view class="muted" style="margin-top: 8rpx;">{{detailItem}}</view>
+          </block>
         </view>
         <textarea
           class="search-input"
@@ -160,31 +265,50 @@
           <view class="tag {{resolvedItem.priority.tagClass}}">{{resolvedItem.priority.label}}</view>
         </view>
         <view class="muted">处理时间：{{resolvedItem.resolvedAt || resolvedItem.updatedAt || '暂无'}}</view>
-        <view class="muted">{{resolvedItem.payloadStatusLabel}}</view>
-        <view class="muted" wx:if="{{resolvedItem.candidateVersionLabel || resolvedItem.candidateVersionId}}">
-          候选版本：{{resolvedItem.candidateVersionLabel || resolvedItem.candidateVersionId}}
-        </view>
-        <view class="muted" wx:if="{{resolvedItem.rollbackToVersionLabel || resolvedItem.rollbackToVersionId}}">
-          回退目标：{{resolvedItem.rollbackToVersionLabel || resolvedItem.rollbackToVersionId}}
-        </view>
-        <view class="muted" wx:if="{{resolvedItem.gateCheckSummary && resolvedItem.gateCheckSummary.summary}}">
-          闸门校验：{{resolvedItem.gateCheckSummary.summary}}
-        </view>
-        <view class="muted" wx:if="{{resolvedItem.noticeTitle}}">公告：{{resolvedItem.noticeTitle}}</view>
-        <view class="muted" wx:if="{{resolvedItem.parseStatus}}">解析状态：{{resolvedItem.parseStatus}}</view>
-        <view class="muted" wx:if="{{resolvedItem.fieldCoveragePercent}}">字段覆盖率：{{resolvedItem.fieldCoveragePercent}}%</view>
-        <view class="muted" wx:if="{{resolvedItem.workbookSheetSummary}}">工作表摘要：{{resolvedItem.workbookSheetSummary}}</view>
         <view class="muted" wx:if="{{resolvedItem.releaseImpact}}">发布影响：{{resolvedItem.releaseImpact}}</view>
         <view class="muted" wx:if="{{resolvedItem.resolutionSuggestion}}">处理建议：{{resolvedItem.resolutionSuggestion}}</view>
         <view class="muted" wx:if="{{resolvedItem.resolutionNote}}">处理备注：{{resolvedItem.resolutionNote}}</view>
-        <block wx:for="{{resolvedItem.reasons}}" wx:key="*this" wx:for-item="resolvedReason">
-          <view class="muted" style="margin-top: 8rpx;">原因：{{resolvedReason}}</view>
-        </block>
         <view class="tag-row" style="margin-top: 12rpx;">
+          <view
+            class="button secondary compact-button"
+            data-id="{{resolvedItem.id}}"
+            data-section="resolved"
+            bindtap="toggleReviewItemDetail"
+          >
+            {{resolvedReviewItemExpanded[resolvedItem.id] ? '收起详情' : '展开详情'}}
+          </view>
           <view class="button secondary compact-button" data-id="{{resolvedItem.id}}" bindtap="reopenItem">重新打开</view>
+        </view>
+        <view wx:if="{{resolvedReviewItemExpanded[resolvedItem.id]}}">
+          <view class="muted">{{resolvedItem.payloadStatusLabel}}</view>
+          <view class="muted" wx:if="{{resolvedItem.candidateVersionLabel || resolvedItem.candidateVersionId}}">
+            候选版本：{{resolvedItem.candidateVersionLabel || resolvedItem.candidateVersionId}}
+          </view>
+          <view class="muted" wx:if="{{resolvedItem.rollbackToVersionLabel || resolvedItem.rollbackToVersionId}}">
+            回退目标：{{resolvedItem.rollbackToVersionLabel || resolvedItem.rollbackToVersionId}}
+          </view>
+          <view class="muted" wx:if="{{resolvedItem.gateCheckSummary && resolvedItem.gateCheckSummary.summary}}">
+            发布闸门：{{resolvedItem.gateCheckSummary.summary}}
+          </view>
+          <view class="muted" wx:if="{{resolvedItem.gateChecks && resolvedItem.gateChecks.length}}">
+            当前卡点：{{resolvedItem.gateChecks[0].label}} · {{resolvedItem.gateChecks[0].status}}{{resolvedItem.gateChecks[0].detail ? ' · ' + resolvedItem.gateChecks[0].detail : ''}}
+          </view>
+          <view class="muted" wx:if="{{resolvedItem.noticeTitle}}">公告：{{resolvedItem.noticeTitle}}</view>
+          <view class="muted" wx:if="{{resolvedItem.noticePublishedAt}}">公告发布时间：{{resolvedItem.noticePublishedAt}}</view>
+          <view class="muted" wx:if="{{resolvedItem.parseStatus}}">解析状态：{{resolvedItem.parseStatus}}</view>
+          <view class="muted" wx:if="{{resolvedItem.fieldCoveragePercent}}">字段覆盖率：{{resolvedItem.fieldCoveragePercent}}%</view>
+          <view class="muted" wx:if="{{resolvedItem.rowsTotal}}">结构化岗位数：{{resolvedItem.rowsTotal}}</view>
+          <view class="muted" wx:if="{{resolvedItem.workbookSheetSummary}}">工作表摘要：{{resolvedItem.workbookSheetSummary}}</view>
+          <block wx:for="{{resolvedItem.reasons}}" wx:key="*this" wx:for-item="resolvedReason">
+            <view class="muted" style="margin-top: 8rpx;">原因：{{resolvedReason}}</view>
+          </block>
+          <block wx:for="{{resolvedItem.detailLines}}" wx:key="*this" wx:for-item="detailItem">
+            <view class="muted" style="margin-top: 8rpx;">{{detailItem}}</view>
+          </block>
         </view>
       </view>
     </block>
     <view class="muted" wx:if="{{!resolvedReviewQueue.length}}">当前还没有已处理记录。</view>
   </view>
+  </block>
 </view>

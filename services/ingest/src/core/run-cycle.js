@@ -1,5 +1,6 @@
 const path = require("node:path");
 const { recommendSimilarPositions } = require("../../../../packages/shared/src");
+const { ensureLocalRuntimeSeed, localRuntimePaths } = require("../../../runtime-paths");
 const { getSources } = require("../config/sources");
 const { createAdapterMap } = require("../config/adapters");
 const { FileStore } = require("../storage/file-store");
@@ -10,12 +11,7 @@ const { runPipeline } = require("./pipeline");
 const { loadPositionOverrideRules } = require("./position-overrides");
 
 function defaultPaths() {
-  return {
-    storeRoot: path.resolve(__dirname, "../../var"),
-    artifactsRoot: path.resolve(__dirname, "../../var/artifacts"),
-    positionOverridePath: path.resolve(__dirname, "../../var/position-overrides.json"),
-    snapshotTarget: path.resolve(__dirname, "../../../../apps/weapp/data/ingested.js")
-  };
+  return localRuntimePaths();
 }
 
 function buildAlertBase(source, state, now, severity) {
@@ -175,8 +171,9 @@ function logRecommendations(store) {
 
 async function runIngestCycle(options = {}) {
   const paths = defaultPaths();
+  ensureLocalRuntimeSeed(paths);
   const now = resolveDate(options.now) || new Date();
-  const store = options.store || new FileStore(options.storeRoot || paths.storeRoot);
+  const store = options.store || new FileStore(options.storeRoot || paths.ingestStoreRoot);
   const sources = options.sources || getSources();
   const adapters = options.adapters || createAdapterMap(sources);
   const artifactsRoot = options.artifactsRoot || paths.artifactsRoot;

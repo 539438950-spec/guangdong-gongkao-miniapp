@@ -1,14 +1,12 @@
 const path = require("node:path");
+const { ensureLocalRuntimeSeed, localRuntimePaths } = require("../../runtime-paths");
 
 const { FileStore } = require("./storage/file-store");
 const { exportWeappSnapshot } = require("./publish/export-weapp-snapshot");
 const { mapSourceState, canApplyPositionsOpenOverride } = require("./publish/source-state");
 
 function defaultReleasePaths() {
-  return {
-    storeRoot: path.resolve(__dirname, "../var"),
-    snapshotTarget: path.resolve(__dirname, "../../..", "apps/weapp/data/ingested.js")
-  };
+  return localRuntimePaths();
 }
 
 function normalizeReleaseMode(mode) {
@@ -70,7 +68,8 @@ function buildReleaseAuditDetail(sourceState, input) {
 
 function setSourceReleaseOverride(input, options = {}) {
   const paths = defaultReleasePaths();
-  const storeRoot = options.storeRoot || paths.storeRoot;
+  ensureLocalRuntimeSeed(paths);
+  const storeRoot = options.storeRoot || paths.ingestStoreRoot;
   const snapshotTarget = options.snapshotTarget || paths.snapshotTarget;
   const now = options.now || new Date().toISOString();
   const normalizedInput = validateReleaseOverrideInput(input);
@@ -124,7 +123,8 @@ function setSourceReleaseOverride(input, options = {}) {
 
 function listPublishAudits(options = {}) {
   const paths = defaultReleasePaths();
-  const store = new FileStore(options.storeRoot || paths.storeRoot);
+  ensureLocalRuntimeSeed(paths);
+  const store = new FileStore(options.storeRoot || paths.ingestStoreRoot);
   return store.listPublishAudits(options.sourceId || "");
 }
 

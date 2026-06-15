@@ -1,8 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { defaultPaths, handleApiRequest } = require("./core");
-
 function decodeBody(body, isBase64Encoded) {
   if (!body) {
     return "";
@@ -40,7 +38,8 @@ function copyPathIfMissing(sourcePath, targetPath) {
 }
 
 function buildCloudRuntimeOptions(options = {}) {
-  const packagedDefaults = defaultPaths();
+  const { packagedBaselinePaths } = require("./core");
+  const packagedDefaults = packagedBaselinePaths();
   const runtimeRoot = options.runtimeRoot || path.join(
     process.env.TMPDIR || process.env.TEMP || "/tmp",
     "gongkao-api-runtime"
@@ -73,6 +72,7 @@ function buildCloudRuntimeOptions(options = {}) {
 }
 
 async function cloudFunctionHandler(event = {}, context = {}, options = {}) {
+  const { handleApiRequest } = require("./core");
   const runtimeOptions = buildCloudRuntimeOptions(options);
   const result = await handleApiRequest(
     {

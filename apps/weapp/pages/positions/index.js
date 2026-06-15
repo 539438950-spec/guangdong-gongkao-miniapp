@@ -900,6 +900,8 @@ function sortPositions(positions, sortMode = "manual") {
 
 Page({
   data: {
+    pageState: "loading",
+    pageStatusMessage: "",
     notice: null,
     noticeTrust: null,
     positions: [],
@@ -969,13 +971,18 @@ Page({
   },
 
   onShow() {
+    this.setData({
+      pageState: "loading",
+      pageStatusMessage: "正在加载岗位与对比方案..."
+    });
+
     const referencePromise = !this.referenceFilterApplied && this.savedFilterId
       ? api.getSavedFilter(this.savedFilterId)
       : !this.referenceFilterApplied && this.subscriptionId
         ? api.getSubscription(this.subscriptionId)
         : Promise.resolve(null);
 
-    Promise.all([
+    return Promise.all([
       api.listCompareGroups(),
       api.listPositionsByNotice(this.noticeId),
       referencePromise,
@@ -1015,6 +1022,10 @@ Page({
 
       if (!payload.canViewPositions) {
         this.setData({
+          pageState: payload.notice ? "degraded" : "empty",
+          pageStatusMessage: payload.notice
+            ? "当前岗位表尚未通过结构化校验，先保持公告模式。"
+            : "当前公告暂不可用。",
           notice: payload.notice,
           noticeTrust: payload.noticeTrust || null,
           positions: [],
@@ -1057,6 +1068,8 @@ Page({
         .map((item) => decoratePositionWithCompareSuggestion(item, this.allCompareGroups, currentGroup));
 
       this.setData({
+        pageState: allPositions.length ? "content" : "empty",
+        pageStatusMessage: allPositions.length ? "" : "当前公告暂无可展示岗位。",
         notice: payload.notice,
         noticeTrust: payload.noticeTrust || null,
         allPositions,
@@ -1092,6 +1105,12 @@ Page({
       }
 
       this.applyFilters();
+    }).catch((error) => {
+      this.setData({
+        pageState: "error",
+        pageStatusMessage: error && error.message ? error.message : "加载岗位列表失败"
+      });
+      throw error;
     });
   },
 

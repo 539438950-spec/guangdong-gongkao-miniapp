@@ -1,6 +1,4 @@
 const handlers = require("./api-handlers");
-const http = require("node:http");
-const https = require("node:https");
 
 const API_MODE_STORAGE_KEY = "gongkao-api-mode";
 const API_BASE_URL_STORAGE_KEY = "gongkao-api-base-url";
@@ -91,6 +89,17 @@ function normalizeBaseUrl(baseUrl) {
   return String(baseUrl || "").trim().replace(/\/$/, "");
 }
 
+function isLoopbackBaseUrl(baseUrl) {
+  const normalized = normalizeBaseUrl(baseUrl);
+  return /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(normalized);
+}
+
+function isProjectDefaultLoopbackRuntime(config = {}) {
+  return config.mode === "remote"
+    && config.sourceType === "project-default"
+    && isLoopbackBaseUrl(config.baseUrl);
+}
+
 function normalizeDiagnostics(input) {
   if (!input) {
     return null;
@@ -119,11 +128,18 @@ function mapConfigSourceLabel(sourceType) {
 }
 
 function getResolvedConnectionPresets() {
-  const presets = CONNECTION_PRESETS.slice();
+  const presets = CONNECTION_PRESETS.map((preset) => ({ ...preset }));
   const appConfig = getAppConfig();
   const appDefaultMode = normalizeMode(appConfig.apiDefaultMode);
   const appDefaultBaseUrl = normalizeBaseUrl(appConfig.apiDefaultBaseUrl);
   const appDefaultLabel = String(appConfig.apiDefaultLabel || "").trim();
+  const localDevPreset = presets.find((item) => item.id === "local-dev");
+
+  if (localDevPreset && appDefaultMode === "remote" && isLoopbackBaseUrl(appDefaultBaseUrl)) {
+    localDevPreset.baseUrl = appDefaultBaseUrl;
+    localDevPreset.name = "本机开发";
+    localDevPreset.description = "跟随最近一次本机 Demo / 开发态 API 地址，适合微信开发者工具直接联调。";
+  }
 
   if (!appDefaultLabel && appDefaultMode === "local" && !appDefaultBaseUrl) {
     return presets;
@@ -140,9 +156,12 @@ function getResolvedConnectionPresets() {
       : "来自 apps/weapp/env.js 的默认本地连接配置。"
   };
 
-  const duplicatedIndex = presets.findIndex(
-    (item) => item.mode === appPreset.mode && item.baseUrl === appPreset.baseUrl
-  );
+  const duplicatedIndex = presets.findIndex((item) => {
+    if (item.id === "local-dev" && isLoopbackBaseUrl(appPreset.baseUrl)) {
+      return false;
+    }
+    return item.mode === appPreset.mode && item.baseUrl === appPreset.baseUrl;
+  });
   if (duplicatedIndex >= 0) {
     presets.splice(duplicatedIndex, 1);
   }
@@ -295,7 +314,7 @@ function getRuntimeConfig() {
   return buildRuntimeConfig(mode, baseUrl, sourceType || "project-default");
 }
 
-function getConnectionDiagnostics(inputConfig) {
+function getConnectionDiagnosticsLegacy(inputConfig) {
   const config = inputConfig || getRuntimeConfig();
   let diagnostics = runtimeHealthDiagnostics;
 
@@ -487,40 +506,40 @@ function sendWxRequest(baseUrl, pathname, method, data) {
 }
 
 function sendNodeRequest(baseUrl, pathname, method, data) {
-  return new Promise((resolve, reject) => {
-    const target = new URL(`${baseUrl.replace(/\/$/, "")}${pathname}`);
-    const body = data === undefined ? "" : JSON.stringify(data);
-    const transport = target.protocol === "https:" ? https : http;
-    const request = transport.request(
-      target,
-      {
-        method,
-        agent: false,
-        headers: {
-          "content-type": "application/json",
-          "content-length": Buffer.byteLength(body),
-          connection: "close"
-        }
-      },
-      (response) => {
-        const chunks = [];
-        response.on("data", (chunk) => chunks.push(chunk));
-        response.on("end", () => {
-          try {
-            const payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-            if ((response.statusCode && response.statusCode >= 400) || payload.ok === false) {
-              reject(new Error(payload.error || `request failed: ${response.statusCode}`));
-              return;
-            }
-            resolve(payload.data);
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }
+  const target = `${baseUrl.replace(/\/$/, "")}${pathname}`;
+  const body = data === undefined ? undefined : JSON.stringify(data);
+  if (typeof fetch !== "function") {
+    return Promise.reject(new Error("fetch is not available in the current runtime"));
+  }
+  return fetch(target, {
+    method,
+    headers: {
+      "content-type": "application/json"
+    },
+    body
+  }).then(async (response) => {
+    const payload = await response.json();
+    if (response.status >= 400 || payload.ok === false) {
+      throw new Error(payload.error || `request failed: ${response.status}`);
+    }
+    return payload.data;
+  }).catch((error) => {
+    const causeMessage = error && error.cause && error.cause.message
+      ? String(error.cause.message)
+      : "";
+    const causeCode = error && error.cause && error.cause.code
+      ? String(error.cause.code)
+      : "";
+    const originalMessage = error && error.message ? String(error.message) : "";
+    const normalizedMessage = causeCode
+      || causeMessage
+      || originalMessage
+      || "request failed";
+    throw new Error(
+      /request failed|ECONNREFUSED|connect/i.test(normalizedMessage)
+        ? normalizedMessage
+        : `request failed: ${normalizedMessage}`
     );
-    request.on("error", reject);
-    request.end(body);
   });
 }
 
@@ -544,8 +563,20 @@ function callLocal(action, args) {
 }
 
 function callAction(action, args = []) {
-  if (shouldUseRemote()) {
-    return callRemote(action, args);
+  const config = getRuntimeConfig();
+  if (config.usingRemote) {
+    return callRemote(action, args).catch((error) => {
+      const message = error && error.message ? String(error.message) : "";
+      const canFallbackToLocal = !REMOTE_ONLY_ACTIONS.has(action)
+        && isProjectDefaultLoopbackRuntime(config)
+        && /request failed|ECONNREFUSED|connect/i.test(message);
+
+      if (!canFallbackToLocal) {
+        throw error;
+      }
+
+      return callLocal(action, args);
+    });
   }
   if (!handlers[action]) {
     if (REMOTE_ONLY_ACTIONS.has(action)) {

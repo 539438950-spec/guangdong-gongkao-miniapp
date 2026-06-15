@@ -4,6 +4,7 @@ const path = require("node:path");
 const ROOT = path.resolve(__dirname, "..");
 
 const FILES_TO_COPY = [
+  "services/runtime-paths.js",
   "services/api/src/cloud-function.js",
   "services/api/src/cloud.js",
   "services/api/src/core.js",

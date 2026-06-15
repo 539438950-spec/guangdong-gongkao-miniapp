@@ -27,6 +27,163 @@ function getGuangdongNotice() {
   return store.listNotices().find((item) => String(item.id || "").includes("rsks-gd")) || store.listNotices()[0];
 }
 
+function summarizeNotices(notices = []) {
+  return notices.map((item) => ({
+    id: item.id,
+    sourceId: item.sourceId,
+    examType: item.examType,
+    title: item.title,
+    hasStructuredPositions: Boolean(item.hasStructuredPositions),
+    positionCount: Number(item.positionCount || 0),
+    mergedSourceCount: Number(item.mergedSourceCount || 0),
+    noticeTrustSourceId: item.noticeTrust ? item.noticeTrust.sourceId : "",
+    noticeTrustStatus: item.noticeTrust ? item.noticeTrust.parseQualityStatus : ""
+  }));
+}
+
+function summarizeSourceStates(sourceStates = []) {
+  return sourceStates.map((item) => ({
+    sourceId: item.sourceId,
+    examType: item.examType,
+    sourceMode: item.sourceMode,
+    parseQualityStatus: item.parseQualityStatus,
+    releaseMode: item.releaseMode,
+    publishGateStatus: item.publishGateStatus,
+    publishGateFocus: item.publishGateFocus,
+    pendingReviewCount: Number(item.pendingReviewCount || 0),
+    consecutiveFailureCount: Number(item.consecutiveFailureCount || 0)
+  }));
+}
+
+function summarizeReviewQueue(reviewQueue = []) {
+  return reviewQueue.map((item) => ({
+    id: item.id,
+    sourceId: item.sourceId,
+    parseStatus: item.parseStatus || "",
+    blockingRelease: Boolean(item.blockingRelease),
+    priorityLevel: item.priority ? item.priority.level : "",
+    gateCheckSummary: item.gateCheckSummary || ""
+  }));
+}
+
+function summarizeCompareGroups(groups = []) {
+  return groups.map((item) => ({
+    id: item.id,
+    name: item.name,
+    examType: item.examType,
+    positionIds: Array.isArray(item.positionIds) ? item.positionIds.slice() : [],
+    pinned: Boolean(item.isPinned),
+    lastUsedAt: item.lastUsedAt || "",
+    sortMode: item.viewPreferences ? item.viewPreferences.sortMode : "",
+    rowFocusMode: item.viewPreferences ? item.viewPreferences.rowFocusMode : "",
+    compareSummary: item.compareSummary ? {
+      positionCount: Number(item.compareSummary.positionCount || 0),
+      matchedCount: Number(item.compareSummary.matchedCount || 0),
+      blockedCount: Number(item.compareSummary.blockedCount || 0),
+      topTitle: item.compareSummary.topTitle || "",
+      bestFitTitle: item.compareSummary.bestFitTitle || ""
+    } : null
+  }));
+}
+
+function summarizeDashboard(dashboard = {}) {
+  return {
+    stats: {
+      noticeCount: Number((dashboard.stats || {}).noticeCount || 0),
+      positionCount: Number((dashboard.stats || {}).positionCount || 0),
+      sourceCount: Number((dashboard.stats || {}).sourceCount || 0),
+      pendingReviewTotal: Number((dashboard.stats || {}).pendingReviewTotal || 0),
+      resolvedReviewTotal: Number((dashboard.stats || {}).resolvedReviewTotal || 0),
+      compareGroupCount: Number((dashboard.stats || {}).compareGroupCount || 0),
+      activeCompareGroupCount: Number((dashboard.stats || {}).activeCompareGroupCount || 0),
+      unreadMessageCount: Number((dashboard.stats || {}).unreadMessageCount || 0)
+    },
+    notices: summarizeNotices(dashboard.notices),
+    sourceStates: summarizeSourceStates(dashboard.sourceStates),
+    reviewQueue: summarizeReviewQueue(dashboard.reviewQueue),
+    compareGroups: summarizeCompareGroups(dashboard.compareGroups),
+    sourceSummary: {
+      sourceCount: Number((dashboard.sourceSummary || {}).sourceCount || 0),
+      sourceAlertCount: Number((dashboard.sourceSummary || {}).sourceAlertCount || 0),
+      gateFailureTypeSummary: Array.isArray((dashboard.sourceSummary || {}).gateFailureTypeSummary)
+        ? dashboard.sourceSummary.gateFailureTypeSummary.map((item) => ({
+          label: item.label,
+          count: Number(item.count || 0)
+        }))
+        : []
+    },
+    reviewSummary: {
+      total: Number((dashboard.reviewSummary || {}).total || 0),
+      resolved: Number((dashboard.reviewSummary || {}).resolved || 0),
+      failedCheckTypeSummary: Array.isArray((dashboard.reviewSummary || {}).failedCheckTypeSummary)
+        ? dashboard.reviewSummary.failedCheckTypeSummary.map((item) => ({
+          label: item.label,
+          count: Number(item.count || 0)
+        }))
+        : []
+    }
+  };
+}
+
+function summarizePositionsPayload(payload = {}) {
+  return {
+    notice: {
+      id: payload.notice ? payload.notice.id : "",
+      examType: payload.notice ? payload.notice.examType : "",
+      hasStructuredPositions: Boolean(payload.notice && payload.notice.hasStructuredPositions),
+      positionCount: Number((payload.notice && payload.notice.positionCount) || 0),
+      mergedSourceCount: Number((payload.notice && payload.notice.mergedSourceCount) || 0),
+      noticeTrustSourceId: payload.noticeTrust ? payload.noticeTrust.sourceId : "",
+      noticeTrustStatus: payload.noticeTrust ? payload.noticeTrust.parseQualityStatus : ""
+    },
+    positions: (payload.positions || []).map((item) => ({
+      id: item.id,
+      noticeId: item.noticeId,
+      examType: item.examType,
+      positionCode: item.positionCode,
+      area: item.area,
+      education: item.education,
+      degree: item.degree,
+      freshGraduateOnly: Boolean(item.freshGraduateOnly),
+      mergedSourceCount: Number(item.mergedSourceCount || 0),
+      noticeTrustSourceId: item.noticeTrust ? item.noticeTrust.sourceId : "",
+      noticeTrustStatus: item.noticeTrust ? item.noticeTrust.parseQualityStatus : ""
+    }))
+  };
+}
+
+function summarizeCompareDetail(payload = {}) {
+  return {
+    group: {
+      id: payload.group ? payload.group.id : "",
+      name: payload.group ? payload.group.name : "",
+      examType: payload.group ? payload.group.examType : "",
+      positionIds: Array.isArray(payload.group && payload.group.positionIds) ? payload.group.positionIds.slice() : [],
+      sortMode: payload.group && payload.group.viewPreferences ? payload.group.viewPreferences.sortMode : "",
+      rowFocusMode: payload.group && payload.group.viewPreferences ? payload.group.viewPreferences.rowFocusMode : "",
+      compareSummary: payload.group && payload.group.compareSummary ? {
+        positionCount: Number(payload.group.compareSummary.positionCount || 0),
+        matchedCount: Number(payload.group.compareSummary.matchedCount || 0),
+        blockedCount: Number(payload.group.compareSummary.blockedCount || 0),
+        topTitle: payload.group.compareSummary.topTitle || "",
+        bestFitTitle: payload.group.compareSummary.bestFitTitle || ""
+      } : null
+    },
+    positions: (payload.positions || []).map((item) => ({
+      id: item.id,
+      noticeId: item.noticeId,
+      examType: item.examType,
+      positionCode: item.positionCode,
+      noticeTrustSourceId: item.noticeTrust ? item.noticeTrust.sourceId : "",
+      noticeTrustStatus: item.noticeTrust ? item.noticeTrust.parseQualityStatus : "",
+      compareSuggestion: item.compareSuggestion ? {
+        matchStatus: item.compareSuggestion.matchStatus || "",
+        ruleSummary: item.compareSuggestion.ruleSummary || ""
+      } : null
+    }))
+  };
+}
+
 test.afterEach(() => {
   delete global.getApp;
   api.setRuntimeConfigForTests({
@@ -34,6 +191,50 @@ test.afterEach(() => {
     baseUrl: ""
   });
   store.__resetStateForTests();
+});
+
+test("api local and remote modes should expose the same read-model semantics for the same seed", async (t) => {
+  installTestSeed(store, "api-parity-seed");
+  api.setRuntimeConfigForTests({
+    mode: "local",
+    baseUrl: ""
+  });
+
+  const localNotices = await api.listNotices();
+  const localSourceStates = await api.listSourceStates();
+  const localDashboard = await api.getDashboard();
+  const localPositionsPayload = await api.listPositionsByNotice("rsks-gd|notice-2026");
+  const localCompareDetail = await api.getCompareGroupDetail("seed-compare-group-1");
+
+  const tmpRoot = path.resolve(process.cwd(), ".tmp");
+  fs.mkdirSync(tmpRoot, { recursive: true });
+  const seedFiles = createServerSeedFiles("weapp-api-parity-seed");
+  const serverInstance = await startApiServer({
+    port: 0,
+    userStateFile: path.join(tmpRoot, `weapp-api-parity-${Date.now()}.json`),
+    snapshotTarget: seedFiles.snapshotTarget,
+    demoSnapshotTarget: seedFiles.demoSnapshotTarget
+  });
+  t.after(async () => {
+    await closeApiServer(serverInstance.server);
+  });
+
+  api.setRuntimeConfigForTests({
+    mode: "remote",
+    baseUrl: `http://127.0.0.1:${serverInstance.port}`
+  });
+
+  const remoteNotices = await api.listNotices();
+  const remoteSourceStates = await api.listSourceStates();
+  const remoteDashboard = await api.getDashboard();
+  const remotePositionsPayload = await api.listPositionsByNotice("rsks-gd|notice-2026");
+  const remoteCompareDetail = await api.getCompareGroupDetail("seed-compare-group-1");
+
+  assert.deepEqual(summarizeNotices(remoteNotices), summarizeNotices(localNotices));
+  assert.deepEqual(summarizeSourceStates(remoteSourceStates), summarizeSourceStates(localSourceStates));
+  assert.deepEqual(summarizeDashboard(remoteDashboard), summarizeDashboard(localDashboard));
+  assert.deepEqual(summarizePositionsPayload(remotePositionsPayload), summarizePositionsPayload(localPositionsPayload));
+  assert.deepEqual(summarizeCompareDetail(remoteCompareDetail), summarizeCompareDetail(localCompareDetail));
 });
 
 test("api module should support remote mode through local service", async (t) => {
@@ -193,6 +394,33 @@ test("api runtime config should surface project default preset from app config",
   assert.ok(summary.sourceLabel);
 });
 
+test("api runtime config should align local-dev preset with loopback project default endpoint", () => {
+  global.getApp = () => ({
+    globalData: {
+      apiDefaultMode: "remote",
+      apiDefaultBaseUrl: "http://127.0.0.1:56613",
+      apiDefaultLabel: "最近一次本机 Demo"
+    }
+  });
+
+  const presets = api.listConnectionPresets();
+  const localDevPreset = presets.find((item) => item.id === "local-dev");
+  const projectDefaultPreset = presets.find((item) => item.id === "project-default");
+
+  assert.ok(localDevPreset);
+  assert.ok(projectDefaultPreset);
+  assert.equal(localDevPreset.baseUrl, "http://127.0.0.1:56613");
+  assert.equal(projectDefaultPreset.baseUrl, "http://127.0.0.1:56613");
+  assert.ok(localDevPreset.description.includes("Demo"));
+
+  const summary = api.getConnectionSummary({
+    mode: "remote",
+    baseUrl: "http://127.0.0.1:56613",
+    sourceType: "project-default"
+  });
+  assert.equal(summary.presetLabel, "最近一次本机 Demo");
+});
+
 test("api runtime config should persist failed health diagnostics", async () => {
   api.setRuntimeConfigForTests({
     mode: "remote",
@@ -210,6 +438,38 @@ test("api runtime config should persist failed health diagnostics", async () => 
   assert.equal(Boolean(diagnostics.checkedAt), true);
   assert.equal(diagnostics.isForCurrentConfig, true);
   assert.ok(diagnostics.scopeLabel);
+});
+
+test("api read actions should fall back to local store when project-default loopback remote is unreachable", async () => {
+  installTestSeed(store, "api-test-seed");
+  global.getApp = () => ({
+    globalData: {
+      apiMode: "remote",
+      apiBaseUrl: "http://127.0.0.1:1",
+      apiDefaultMode: "remote",
+      apiDefaultBaseUrl: "http://127.0.0.1:1",
+      apiConfigSource: "project-default"
+    }
+  });
+
+  api.setRuntimeConfigForTests({
+    mode: "remote",
+    baseUrl: "http://127.0.0.1:1",
+    sourceType: "project-default"
+  });
+
+  const notices = await api.listNotices();
+  const dashboard = await api.getDashboard();
+
+  assert.ok(Array.isArray(notices));
+  assert.ok(notices.length > 0);
+  assert.ok(dashboard);
+  assert.ok(dashboard.stats);
+
+  await assert.rejects(
+    api.listPublishAudits(),
+    /request failed|ECONNREFUSED|connect/
+  );
 });
 
 test("api runtime config should keep historical diagnostics when current base url changes", () => {
@@ -404,10 +664,10 @@ test("api handlers should attach trust metadata to positions compare and recomme
   assert.equal(pinnedGroup.pinnedAt, "2026-06-09T09:14:00.000Z");
 
   const updatedGroup = await api.saveCompareGroupPreferences(group.id, {
-    sortMode: "rule",
+    sortMode: "trust",
     rowFocusMode: "different"
   });
-  assert.equal(updatedGroup.viewPreferences.sortMode, "rule");
+  assert.equal(updatedGroup.viewPreferences.sortMode, "trust");
   assert.equal(updatedGroup.viewPreferences.rowFocusMode, "different");
 
   const compareGroups = await api.listCompareGroups();
@@ -424,7 +684,7 @@ test("api handlers should attach trust metadata to positions compare and recomme
   assert.equal(comparePayload.positions[0].noticeTrust.sourceId, "rsks-gd");
   assert.equal(comparePayload.positions[0].positionSourceName, positionsPayload.notice.positionSourceName);
   assert.equal(comparePayload.positions[0].mergedSourceCount, positionsPayload.notice.mergedSourceCount);
-  assert.equal(comparePayload.group.viewPreferences.sortMode, "rule");
+  assert.equal(comparePayload.group.viewPreferences.sortMode, "trust");
   assert.equal(comparePayload.group.originContext.sourceType, "subscription");
   assert.equal(comparePayload.group.lastActionContext.sourceEntry, "home");
   assert.equal(comparePayload.group.lastUsedAt, "2026-06-09T09:13:00.000Z");

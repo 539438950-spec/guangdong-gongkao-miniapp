@@ -1,4 +1,25 @@
 <view class="page">
+  <view class="card" wx:if="{{pageState === 'loading'}}">
+    <view class="section-title">数据源状态</view>
+    <view class="muted">{{pageStatusMessage || '正在加载来源状态...'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'error'}}">
+    <view class="section-title">数据源状态</view>
+    <view class="muted">{{pageStatusMessage || '加载来源状态失败'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'empty'}}">
+    <view class="section-title">数据源状态</view>
+    <view class="muted">{{pageStatusMessage || '当前还没有来源状态数据。'}}</view>
+  </view>
+
+  <block wx:elif="{{pageState === 'content' || pageState === 'degraded'}}">
+  <view class="card" wx:if="{{pageState === 'degraded' && pageStatusMessage}}">
+    <view class="section-title">状态提醒</view>
+    <view class="muted">{{pageStatusMessage}}</view>
+  </view>
+
   <view class="hero">
     <view class="section-title">数据源状态</view>
     <view>查看已接入来源最近抓取、发布、回退、解析质量和待复核情况。</view>
@@ -6,10 +27,14 @@
     <view class="muted">配置来源：{{connectionSummary.sourceLabel}}</view>
     <view class="muted">{{connectionSummary.endpointLabel}}</view>
     <view class="muted" wx:if="{{connectionSummary.hint}}">{{connectionSummary.hint}}</view>
-    <view class="muted" wx:if="{{sourceName || focusLabel}}" style="margin-top: 12rpx;">
+    <view class="muted" wx:if="{{sourceName || focusLabel || reasonLabel}}" style="margin-top: 12rpx;">
       当前聚焦：{{sourceName || '全部来源'}}{{focusLabel ? ' · ' + focusLabel : ''}}
     </view>
     <view class="muted" style="margin-top: 12rpx;">超时未更新 {{summary.overdueSourceCount}} 个来源，最近告警 {{summary.alertEventCount}} 条。</view>
+    <view class="muted" wx:if="{{reasonLabel}}">当前原因筛选：{{reasonLabel}}</view>
+    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{reasonLabel}}">
+      <view class="button secondary compact-button" bindtap="clearReason">清除原因筛选</view>
+    </view>
     <view class="metrics" style="margin-top: 24rpx;">
       <view class="metric">
         <view>{{summary.sourceCount}}</view>
@@ -57,8 +82,198 @@
     </block>
   </view>
 
+  <view class="card" wx:if="{{qualitySummary}}">
+    <view class="section-title">数据质量面板</view>
+    <view class="muted">只看会影响结构化岗位表发布的质量风险，帮助先处理最容易阻塞前台的数据源。</view>
+    <view class="metrics" style="margin-top: 24rpx;">
+      <view class="metric">
+        <view>{{qualitySummary.structuredHealthyCount}}</view>
+        <view class="muted">结构化健康</view>
+      </view>
+      <view class="metric">
+        <view>{{qualitySummary.coverageRiskCount}}</view>
+        <view class="muted">覆盖率风险</view>
+      </view>
+      <view class="metric">
+        <view>{{qualitySummary.attachmentOnlyCount}}</view>
+        <view class="muted">仅公告模式</view>
+      </view>
+      <view class="metric">
+        <view>{{qualitySummary.workbookRiskCount}}</view>
+        <view class="muted">岗位表异常</view>
+      </view>
+      <view class="metric">
+        <view>{{qualitySummary.reviewBlockedCount}}</view>
+        <view class="muted">复核阻塞</view>
+      </view>
+    </view>
+    <block wx:for="{{qualitySummary.items}}" wx:key="sourceId">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{item.tagClass}}">{{item.tagLabel}}</view>
+        </view>
+        <view class="item-title">{{item.sourceName}}</view>
+        <view class="muted" wx:if="{{item.headline}}" style="margin-top: 8rpx;">{{item.headline}}</view>
+        <view class="muted" wx:if="{{item.detail}}">{{item.detail}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view
+            class="button secondary compact-button"
+            data-action="{{item.action}}"
+            data-source-id="{{item.sourceId}}"
+            data-focus="{{item.focus}}"
+            data-review-focus="{{item.reviewFocus}}"
+            bindtap="openAlertAction"
+          >
+            {{item.actionLabel}}
+          </view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{!qualitySummary.items.length}}">当前所有来源都没有需要优先处理的数据质量阻塞。</view>
+  </view>
+
+  <view class="card" wx:if="{{sourceGroups && sourceGroups.length}}">
+    <view class="section-title">异常分组视图</view>
+    <view class="muted">把当前来源按主要问题桶分开，先看哪一类来源最值得处理，再决定进复核还是继续盯解析。</view>
+    <block wx:for="{{sourceGroups}}" wx:key="id" wx:for-item="group">
+      <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{group.tagClass}}">{{group.label}}</view>
+          <view class="tag">{{group.count}} 个来源</view>
+        </view>
+        <view class="muted" wx:if="{{group.description}}">{{group.description}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{group.actionLabel}}">
+          <view
+            class="button secondary compact-button"
+            data-action="{{group.action}}"
+            data-focus="{{group.focus}}"
+            data-review-focus="{{group.reviewFocus}}"
+            bindtap="openGroupAction"
+          >
+            {{group.actionLabel}}
+          </view>
+        </view>
+        <block wx:for="{{group.items}}" wx:key="sourceId" wx:for-item="groupItem">
+          <view class="compare-summary-row">
+            <view class="compare-summary-label">{{groupItem.sourceName}}</view>
+            <view class="compare-summary-value" wx:if="{{groupItem.headline}}">{{groupItem.headline}}</view>
+            <view class="compare-summary-value" wx:if="{{groupItem.detail}}">{{groupItem.detail}}</view>
+            <view class="tag-row" style="margin-top: 12rpx;">
+              <view
+                class="button secondary compact-button"
+                data-action="{{groupItem.action}}"
+                data-source-id="{{groupItem.sourceId}}"
+                data-focus="{{groupItem.focus}}"
+                data-review-focus="{{groupItem.reviewFocus}}"
+                bindtap="openAlertAction"
+              >
+                {{groupItem.actionLabel}}
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+    </block>
+  </view>
+
+  <view class="card">
+    <view class="section-title">发布审计摘要</view>
+    <view class="muted">聚合最近操作日志里的发版阻塞、稳定回退和运行异常，先看为什么新版本没有进入前台。</view>
+    <view class="metrics" style="margin-top: 24rpx;">
+      <view class="metric">
+        <view>{{publishAuditSummary.blockedCount}}</view>
+        <view class="muted">阻塞发布</view>
+      </view>
+      <view class="metric">
+        <view>{{publishAuditSummary.rollbackCount}}</view>
+        <view class="muted">稳定回退</view>
+      </view>
+      <view class="metric">
+        <view>{{publishAuditSummary.errorCount}}</view>
+        <view class="muted">运行异常</view>
+      </view>
+      <view class="metric">
+        <view>{{publishAuditSummary.publishCount}}</view>
+        <view class="muted">成功发布</view>
+      </view>
+      <view class="metric">
+        <view>{{publishAuditSummary.sourceCount}}</view>
+        <view class="muted">影响来源</view>
+      </view>
+    </view>
+    <block wx:for="{{publishAuditSummary.topReasons}}" wx:key="key">
+      <view class="list-item">
+        <view class="item-title">{{item.label}}</view>
+        <view class="muted">最近出现 {{item.count}} 次</view>
+        <view class="muted" wx:if="{{item.sourceScopeText}}">{{item.sourceScopeText}}</view>
+        <view class="muted" wx:if="{{item.eventTypeSummaryText}}">{{item.eventTypeSummaryText}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.actionLabel}}">
+          <view
+            class="button secondary compact-button"
+            data-source-id="{{item.sourceId}}"
+            data-focus="{{item.focus}}"
+            data-action="{{item.action}}"
+            data-review-focus="{{item.reviewFocus}}"
+            data-reason-key="{{item.key}}"
+            bindtap="openAlertAction"
+          >
+            {{item.actionLabel}}
+          </view>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:if="{{publishAuditSummary.hasAlerts && !publishAuditSummary.topReasons.length}}">
+      最近有发布异常日志，但还没有归一化出高频原因。
+    </view>
+    <view class="muted" wx:if="{{!publishAuditSummary.hasAlerts}}">{{publishAuditSummary.healthyMessage}}</view>
+  </view>
+
   <view class="card">
     <view class="section-title">来源列表</view>
+    <view class="tag-row" style="margin-bottom: 16rpx;">
+      <view
+        class="button {{sourceFilterSummary.activeFocus === '' ? '' : 'secondary'}} compact-button"
+        data-focus=""
+        bindtap="setFocus"
+      >
+        全部来源 {{sourceFilterSummary.allCount}}
+      </view>
+      <view
+        class="button {{sourceFilterSummary.activeFocus === 'review' ? '' : 'secondary'}} compact-button"
+        data-focus="review"
+        bindtap="setFocus"
+      >
+        复核阻塞 {{sourceFilterSummary.reviewCount}}
+      </view>
+      <view
+        class="button {{sourceFilterSummary.activeFocus === 'parse' ? '' : 'secondary'}} compact-button"
+        data-focus="parse"
+        bindtap="setFocus"
+      >
+        解析风险 {{sourceFilterSummary.parseCount}}
+      </view>
+      <view
+        class="button {{sourceFilterSummary.activeFocus === 'rollback' ? '' : 'secondary'}} compact-button"
+        data-focus="rollback"
+        bindtap="setFocus"
+      >
+        绋冲畾鍥為€€ {{sourceFilterSummary.rollbackCount}}
+      </view>
+      <view
+        class="button {{sourceFilterSummary.activeFocus === 'run' ? '' : 'secondary'}} compact-button"
+        data-focus="run"
+        bindtap="setFocus"
+      >
+        运行异常 {{sourceFilterSummary.runCount}}
+      </view>
+      <view
+        class="button {{sourceFilterSummary.activeFocus === 'sla' ? '' : 'secondary'}} compact-button"
+        data-focus="sla"
+        bindtap="setFocus"
+      >
+        SLA告警 {{sourceFilterSummary.slaCount}}
+      </view>
+    </view>
     <view class="button secondary" style="margin-bottom: 16rpx;" bindtap="openReviewCenter">打开复核中心</view>
     <view class="muted" style="margin-bottom: 16rpx;">{{releaseControlHint}}</view>
     <block wx:for="{{sourceStates}}" wx:key="sourceId">
@@ -77,6 +292,26 @@
           </view>
         </view>
         <view class="item-title">{{item.sourceName}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.opsSnapshot && item.opsSnapshot.headline}}">
+          <view class="tag {{item.publishGate && item.publishGate.tone === 'warn' ? 'tag-warn' : ((item.publishGate && item.publishGate.tone === 'ok') ? 'tag-active' : '')}}">
+            当前判断
+          </view>
+          <view class="tag">{{item.opsSnapshot.headline}}</view>
+        </view>
+        <view class="muted" wx:if="{{item.opsSnapshot && item.opsSnapshot.detail}}" style="margin-top: 8rpx;">
+          {{item.opsSnapshot.detail}}
+        </view>
+        <view class="metrics compare-metrics" style="margin-top: 16rpx;" wx:if="{{item.opsSnapshot && item.opsSnapshot.quickFacts.length}}">
+          <block wx:for="{{item.opsSnapshot.quickFacts}}" wx:key="label">
+            <view class="metric compare-metric">
+              <view class="muted">{{item.label}}</view>
+              <view class="row-value" style="margin-top: 8rpx;">{{item.value}}</view>
+            </view>
+          </block>
+        </view>
+        <view class="muted" wx:if="{{item.opsSnapshot && item.opsSnapshot.actionDetail}}" style="margin-top: 8rpx;">
+          操作建议：{{item.opsSnapshot.actionDetail}}
+        </view>
         <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.publishGate}}">
           <view class="tag {{item.publishGate.tone === 'warn' ? 'tag-warn' : (item.publishGate.tone === 'ok' ? 'tag-active' : '')}}">
             发布闸门
@@ -90,6 +325,40 @@
           当前风险：{{item.riskSummary.headline}}
         </view>
         <view class="muted" wx:if="{{item.riskSummary && item.riskSummary.detail}}">{{item.riskSummary.detail}}</view>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.sourceCardActions && (item.sourceCardActions.primaryAction || item.sourceCardActions.secondaryAction)}}">
+          <view
+            class="button secondary compact-button"
+            wx:if="{{item.sourceCardActions.primaryAction}}"
+            data-action="{{item.sourceCardActions.primaryAction.action}}"
+            data-source-id="{{item.sourceId}}"
+            data-focus="{{item.sourceCardActions.primaryAction.focus}}"
+            data-review-focus="{{item.sourceCardActions.primaryAction.reviewFocus}}"
+            bindtap="openAlertAction"
+          >
+            {{item.sourceCardActions.primaryAction.label}}
+          </view>
+          <view
+            class="button secondary compact-button"
+            wx:if="{{item.sourceCardActions.secondaryAction}}"
+            data-action="{{item.sourceCardActions.secondaryAction.action}}"
+            data-source-id="{{item.sourceId}}"
+            data-focus="{{item.sourceCardActions.secondaryAction.focus}}"
+            data-review-focus="{{item.sourceCardActions.secondaryAction.reviewFocus}}"
+            bindtap="openAlertAction"
+          >
+            {{item.sourceCardActions.secondaryAction.label}}
+          </view>
+        </view>
+        <view class="tag-row" style="margin-top: 12rpx;">
+          <view
+            class="button secondary compact-button"
+            data-source-id="{{item.sourceId}}"
+            bindtap="toggleSourceDetail"
+          >
+            {{sourceDetailExpanded[item.sourceId] ? '鏀惰捣璇︽儏' : '灞曞紑璇︽儏'}}
+          </view>
+        </view>
+        <block wx:if="{{sourceDetailExpanded[item.sourceId]}}">
         <view class="muted">轮询周期：{{item.scheduleMinutes}} 分钟 · 发布 SLA：{{item.publishSlaMinutes}} 分钟</view>
         <view class="muted">时效状态：{{item.slaStatusLabel}}</view>
         <view class="muted">最近抓取尝试：{{item.lastFetchedAt || '暂无'}}</view>
@@ -135,21 +404,22 @@
           附件候选：{{item.candidateWorkbookCount || 0}} 个，解包表格：{{item.extractedWorkbookCount || 0}} 个
         </view>
         <view class="muted" wx:if="{{item.parseErrorCount}}">解析错误：{{item.parseErrorCount}} 个</view>
-        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.pendingReviewCount}}">
+        </block>
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceDetailExpanded[item.sourceId] && item.pendingReviewCount}}">
           <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" bindtap="focusReviewCenter">查看该来源复核</view>
         </view>
-        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.stalePendingReviewCount}}">
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceDetailExpanded[item.sourceId] && item.stalePendingReviewCount}}">
           <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-review-focus="stale" bindtap="focusReviewCenter">清理历史复核</view>
         </view>
-        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.publishGate && item.publishGate.focus === 'review'}}">
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceDetailExpanded[item.sourceId] && item.publishGate && item.publishGate.focus === 'review'}}">
           <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-review-focus="blocking" bindtap="focusReviewCenter">处理待复核</view>
         </view>
-        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{item.publishGate && item.publishGate.focus && item.publishGate.focus !== 'review'}}">
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceDetailExpanded[item.sourceId] && item.publishGate && item.publishGate.focus && item.publishGate.focus !== 'review'}}">
           <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-focus="{{item.publishGate.focus}}" bindtap="openFocusedStatus">
             查看对应风险
           </view>
         </view>
-        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{canManageReleaseControls}}">
+        <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceDetailExpanded[item.sourceId] && canManageReleaseControls}}">
           <view class="button secondary compact-button" data-source-id="{{item.sourceId}}" data-mode="notice-only" bindtap="applyReleaseOverride">
             锁定仅公告
           </view>
@@ -173,9 +443,13 @@
         <view class="muted" wx:if="{{item.gateFailureReason}}">闸门拒绝原因：{{item.gateFailureReason}}</view>
         <view class="muted" wx:if="{{item.lastErrorSummary}}">最近错误：{{item.lastErrorSummary}}</view>
 
-        <view class="muted" wx:if="{{item.recentAudits && item.recentAudits.length}}" style="margin-top: 12rpx;">最近发布审计：</view>
+        <view class="muted" wx:if="{{item.recentAudits && item.recentAudits.length}}" style="margin-top: 12rpx;">最近操作日志：</view>
         <block wx:for="{{item.recentAudits}}" wx:key="id">
-          <view class="muted">{{item.createdAt}} · {{item.summary}}{{item.detail ? ' · ' + item.detail : ''}}</view>
+          <view class="tag-row" style="margin-top: 12rpx;">
+            <view class="tag {{item.tagClass}}">{{item.eventTypeLabel}}</view>
+          </view>
+          <view class="muted">{{item.createdAt}} · {{item.summary}}</view>
+          <view class="muted" wx:if="{{item.detail}}">{{item.detail}}</view>
         </block>
       </view>
     </block>
@@ -183,15 +457,18 @@
   </view>
 
   <view class="card">
-    <view class="section-title">最近发布审计</view>
+    <view class="section-title">最近操作日志</view>
     <block wx:for="{{publishAudits}}" wx:key="id">
       <view class="list-item">
+        <view class="tag-row" style="margin-bottom: 12rpx;">
+          <view class="tag {{item.tagClass}}">{{item.eventTypeLabel}}</view>
+        </view>
         <view class="item-title">{{item.summary}}</view>
         <view class="muted">{{item.sourceName}} · {{item.createdAt || '暂无'}}</view>
         <view class="muted" wx:if="{{item.detail}}">{{item.detail}}</view>
       </view>
     </block>
-    <view class="muted" wx:if="{{!publishAudits.length}}">当前还没有最近发布审计。</view>
+    <view class="muted" wx:if="{{!publishAudits.length}}">当前还没有最近操作日志。</view>
   </view>
 
   <view class="card">
@@ -220,4 +497,5 @@
     </block>
     <view class="muted" wx:if="{{!alertEvents.length}}">当前还没有最近告警。</view>
   </view>
+  </block>
 </view>

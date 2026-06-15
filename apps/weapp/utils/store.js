@@ -2,6 +2,8 @@ const STORAGE_KEY = "gongkao-miniapp-state";
 const COMPARE_LIMIT = 4;
 const GROUP_LIMIT = 20;
 let seedSnapshotLoaderOverride = null;
+let nodeSeedSnapshotCache = null;
+let runtimeSeedModeOverride = "";
 const { explainMajorMatch } = require("./major-matcher");
 const { describeComparePlan } = require("./compare-group-actions");
 const { buildPositionNextActionSummary } = require("./position-action-guidance");
@@ -40,6 +42,93 @@ function isNodeRuntime() {
   return typeof process !== "undefined" && process.release && process.release.name === "node";
 }
 
+function getNodeRequire() {
+  if (!isNodeRuntime()) {
+    return null;
+  }
+
+  try {
+    return eval("require");
+  } catch (_error) {
+    return null;
+  }
+}
+
+function clearNodeSeedSnapshotCache() {
+  nodeSeedSnapshotCache = null;
+}
+
+function loadDemoSeedSnapshot() {
+  const demo = require("../data/demo");
+  return {
+    seed: demo,
+    seedVersion: demo.updatedAt || "demo"
+  };
+}
+
+function resolveSeedRuntimeMode() {
+  if (runtimeSeedModeOverride === "demo") {
+    return "demo";
+  }
+  if (runtimeSeedModeOverride === "ingested") {
+    return "ingested";
+  }
+  return isNodeRuntime() ? "ingested" : "demo";
+}
+
+function getNodeFileVersion(fs, filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    return Number(stat.mtimeMs || 0);
+  } catch (_error) {
+    return 0;
+  }
+}
+
+// Cache large seed snapshots in Node, but invalidate when source files change.
+function loadNodeSeedSnapshot() {
+  const nodeRequire = getNodeRequire();
+  if (!nodeRequire) {
+    return null;
+  }
+
+  try {
+    const fs = nodeRequire("node:fs");
+    const path = nodeRequire("node:path");
+    const demoPath = path.resolve(__dirname, "../data/demo.js");
+    const ingestedPath = path.resolve(__dirname, "../data/ingested.js");
+    const cacheKey = [
+      getNodeFileVersion(fs, demoPath),
+      getNodeFileVersion(fs, ingestedPath)
+    ].join(":");
+
+    if (nodeSeedSnapshotCache && nodeSeedSnapshotCache.cacheKey === cacheKey) {
+      return nodeSeedSnapshotCache.snapshot;
+    }
+
+    const demoModuleId = nodeRequire.resolve("../data/demo");
+    const ingestedModuleId = nodeRequire.resolve("../data/ingested");
+    delete nodeRequire.cache[demoModuleId];
+    delete nodeRequire.cache[ingestedModuleId];
+
+    const demo = nodeRequire("../data/demo");
+    const ingested = nodeRequire("../data/ingested");
+    const seed = ingested.notices && ingested.notices.length ? ingested : demo;
+    const snapshot = {
+      seed,
+      seedVersion: seed.updatedAt || "demo"
+    };
+
+    nodeSeedSnapshotCache = {
+      cacheKey,
+      snapshot
+    };
+    return snapshot;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function loadSeedSnapshot() {
   if (typeof seedSnapshotLoaderOverride === "function") {
     const loaded = seedSnapshotLoaderOverride();
@@ -48,25 +137,14 @@ function loadSeedSnapshot() {
     }
   }
 
-  let demo = require("../data/demo");
-  let ingested = require("../data/ingested");
-
-  if (isNodeRuntime()) {
-    try {
-      delete require.cache[require.resolve("../data/demo")];
-      delete require.cache[require.resolve("../data/ingested")];
-      demo = require("../data/demo");
-      ingested = require("../data/ingested");
-    } catch (_error) {
-      // Keep the currently loaded seed when cache invalidation is unavailable.
+  if (resolveSeedRuntimeMode() === "ingested" && isNodeRuntime()) {
+    const snapshot = loadNodeSeedSnapshot();
+    if (snapshot && snapshot.seed) {
+      return snapshot;
     }
   }
 
-  const seed = ingested.notices && ingested.notices.length ? ingested : demo;
-  return {
-    seed,
-    seedVersion: seed.updatedAt || "demo"
-  };
+  return loadDemoSeedSnapshot();
 }
 
 function matchKeyword(position, keyword) {
@@ -804,7 +882,7 @@ function getCompareStatus(positionId, groupId) {
 }
 
 function normalizeCompareGroupPreferences(preferences = {}) {
-  const sortMode = ["manual", "rule", "eligibility"].includes(preferences.sortMode)
+  const sortMode = ["manual", "rule", "eligibility", "trust"].includes(preferences.sortMode)
     ? preferences.sortMode
     : "manual";
   const rowFocusMode = ["all", "different", "barrier"].includes(preferences.rowFocusMode)
@@ -963,6 +1041,7 @@ function deleteCompareGroup(groupId) {
   ensureLoaded();
   state.compareGroups = state.compareGroups.filter((item) => item.id !== groupId);
   if (!state.compareGroups.length) {
+    const { seed } = loadSeedSnapshot();
     state.compareGroups = clone(seed.compareGroups || []);
   }
   persistState();
@@ -1701,11 +1780,26 @@ function getDashboardStats() {
 
 function __resetStateForTests() {
   seedSnapshotLoaderOverride = null;
+  clearNodeSeedSnapshotCache();
+  runtimeSeedModeOverride = "";
   state = buildSeedState();
 }
 
-function __setSeedSnapshotLoaderForTests(loader) {
+function __setSeedSnapshotLoaderForTests(loader, options = {}) {
   seedSnapshotLoaderOverride = typeof loader === "function" ? loader : null;
+  clearNodeSeedSnapshotCache();
+  if (options && options.rebuild === false) {
+    return;
+  }
+  state = buildSeedState(buildPersistedUserState(state));
+}
+
+function __setRuntimeSeedModeForTests(mode, options = {}) {
+  runtimeSeedModeOverride = mode === "demo" ? "demo" : (mode === "ingested" ? "ingested" : "");
+  clearNodeSeedSnapshotCache();
+  if (options && options.rebuild === false) {
+    return;
+  }
   state = buildSeedState(buildPersistedUserState(state));
 }
 
@@ -1803,6 +1897,7 @@ module.exports = {
   __exportUserStateForServer,
   __hydrateUserStateForServer,
   __setSeedSnapshotLoaderForTests,
+  __setRuntimeSeedModeForTests,
   __resetStateForTests,
   __setPositionsForTests,
   __setSourceStatesForTests,

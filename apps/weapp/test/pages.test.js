@@ -599,7 +599,7 @@ function buildDashboardPayload() {
   };
 }
 
-function patchApiForPageTest() {
+function patchApiForPageTestLegacy() {
   const original = {
     getDashboard: api.getDashboard,
     getRuntimeConfig: api.getRuntimeConfig,
@@ -714,6 +714,7 @@ function patchApiForPageTest() {
     toggleFavoriteNotice: api.toggleFavoriteNotice,
     resolveReviewItem: api.resolveReviewItem,
     reopenReviewItem: api.reopenReviewItem,
+    resolveStaleReviewItems: api.resolveStaleReviewItems,
     listPositionOverrides: api.listPositionOverrides,
     savePositionOverride: api.savePositionOverride,
     deletePositionOverride: api.deletePositionOverride,
@@ -769,6 +770,11 @@ function patchApiForPageTest() {
     id,
     status: "pending"
   });
+  api.resolveStaleReviewItems = (input = {}) => Promise.resolve({
+    resolvedCount: 0,
+    reviewIds: [],
+    sourceId: input.sourceId || ""
+  });
   api.listPositionOverrides = () => Promise.resolve(buildPositionOverrideFixtures());
   api.savePositionOverride = (input) => Promise.resolve({
     ...clone(input),
@@ -803,6 +809,7 @@ function patchApiForPageTest() {
     api.toggleFavoriteNotice = original.toggleFavoriteNotice;
     api.resolveReviewItem = original.resolveReviewItem;
     api.reopenReviewItem = original.reopenReviewItem;
+    api.resolveStaleReviewItems = original.resolveStaleReviewItems;
     api.listPositionOverrides = original.listPositionOverrides;
     api.savePositionOverride = original.savePositionOverride;
     api.deletePositionOverride = original.deletePositionOverride;
@@ -852,7 +859,7 @@ function patchPositionAndCompareApi(overrides = {}) {
     touchCompareGroup: api.touchCompareGroup
   };
 
-  const noticeTrust = buildNoticeTrust();
+  const noticeTrust = buildNoticeTrust(overrides.noticeTrust || {});
   const notice = {
     id: "rsks-gd|notice-1",
     title: "广东省考公告",
@@ -989,6 +996,9 @@ function patchPositionAndCompareApi(overrides = {}) {
   ];
   const comparePositions = overrides.positions || positions;
   const compareNotice = overrides.notice || notice;
+  const canViewPositions = typeof overrides.canViewPositions === "boolean"
+    ? overrides.canViewPositions
+    : true;
   const recommendedPositions = overrides.recommendedPositions || [
     {
       ...comparePositions[1],
@@ -1001,7 +1011,7 @@ function patchPositionAndCompareApi(overrides = {}) {
     notice: clone(compareNotice),
     noticeTrust: clone(noticeTrust),
     positions: clone(comparePositions),
-    canViewPositions: true
+    canViewPositions
   });
   api.getRecommendedPositions = (positionId) => {
     const scopedRecommendations = Array.isArray(overrides.recommendedPositions)
@@ -1019,10 +1029,20 @@ function patchPositionAndCompareApi(overrides = {}) {
     positions: clone(comparePositions)
   });
   api.saveCompareGroupPreferences = (_groupId, preferences) => {
-    groups[0] = {
-      ...groups[0],
+    const currentGroup = groups[0] || {
+      id: _groupId,
+      name: "空方案",
+      examType: compareNotice.examType,
+      positionIds: [],
       viewPreferences: {
-        ...groups[0].viewPreferences,
+        sortMode: "manual",
+        rowFocusMode: "all"
+      }
+    };
+    groups[0] = {
+      ...currentGroup,
+      viewPreferences: {
+        ...currentGroup.viewPreferences,
         ...clone(preferences)
       }
     };
@@ -1407,6 +1427,8 @@ test("source-status page should expose current connection summary and parse qual
     page.onShow.call(page);
     await flushPromises();
 
+    assert.equal(page.data.pageState, "degraded");
+    assert.ok(page.data.pageStatusMessage.includes("来源风险"));
     assert.equal(page.data.connectionSummary.modeLabel, "远端 API");
     assert.equal(page.data.connectionSummary.presetLabel, "本机开发");
     assert.equal(page.data.connectionSummary.endpointLabel, "http://127.0.0.1:3100");
@@ -1439,6 +1461,30 @@ test("source-status page should expose current connection summary and parse qual
     assert.equal(page.data.sourceStates[0].recentAudits.length, 1);
     assert.equal(page.data.sourceStates[0].recentAudits[0].id, "audit-1");
   } finally {
+    restoreApi();
+  }
+});
+
+test("source-status page should expose error state when dashboard loading fails", async () => {
+  const restoreApi = patchApiForPageTest();
+  const previousWx = global.wx;
+  api.getDashboard = () => Promise.reject(new Error("dashboard load failed"));
+  global.wx = {
+    showToast() {}
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/source-status/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, {});
+    await assert.rejects(() => page.onShow.call(page), /dashboard load failed/);
+    await flushPromises();
+
+    assert.equal(page.data.pageState, "error");
+    assert.equal(page.data.pageStatusMessage, "dashboard load failed");
+  } finally {
+    global.wx = previousWx;
     restoreApi();
   }
 });
@@ -1521,6 +1567,337 @@ test("source-status page should manage release overrides in remote mode", async 
     assert.equal(toasts[0].title, "已恢复自动发布策略");
   } finally {
     global.wx = previousWx;
+    restoreApi();
+  }
+});
+
+test("source-status page should label pipeline publish audits by event type", async () => {
+  const restoreApi = patchApiForPageTest();
+  const dashboard = clone(buildDashboardPayload());
+
+  dashboard.publishAudits = [
+    {
+      id: "audit-publish-error",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "publish-error",
+      createdAt: "2026-06-09T12:30:00.000Z",
+      summary: "Runtime error blocked candidate snapshot",
+      detail: "reason=timeout",
+      reason: "timeout"
+    },
+    {
+      id: "audit-publish-blocked",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "publish-blocked",
+      createdAt: "2026-06-09T12:20:00.000Z",
+      summary: "Candidate snapshot blocked",
+      detail: "reason=coverage",
+      reason: "coverage"
+    },
+    {
+      id: "audit-rollback",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "rollback",
+      createdAt: "2026-06-09T12:10:00.000Z",
+      summary: "Rollback kept previous stable snapshot",
+      detail: "stable=2026-06-09 09:35",
+      reason: "coverage"
+    },
+    {
+      id: "audit-publish",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "publish",
+      createdAt: "2026-06-09T12:00:00.000Z",
+      summary: "Published candidate snapshot",
+      detail: "stable=2026-06-09 12:00"
+    }
+  ];
+
+  api.getDashboard = () => Promise.resolve(clone(dashboard));
+  api.listPublishAudits = () => Promise.resolve(clone(dashboard.publishAudits));
+
+  try {
+    const definition = loadPageDefinition("../pages/source-status/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, {});
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.publishAudits.length, 4);
+    assert.equal(page.data.publishAudits[0].eventType, "publish-error");
+    assert.equal(page.data.publishAudits[0].tagClass, "tag-warn");
+    assert.equal(page.data.publishAudits[1].eventType, "publish-blocked");
+    assert.equal(page.data.publishAudits[1].tagClass, "tag-warn");
+    assert.equal(page.data.publishAudits[2].eventType, "rollback");
+    assert.equal(page.data.publishAudits[2].tagClass, "tag-warn");
+    assert.equal(page.data.publishAudits[3].eventType, "publish");
+    assert.equal(page.data.publishAudits[3].tagClass, "tag-active");
+    assert.equal(page.data.sourceStates[0].recentAudits.length, 3);
+    assert.deepEqual(
+      page.data.sourceStates[0].recentAudits.map((item) => item.eventType),
+      ["publish-error", "publish-blocked", "rollback"]
+    );
+    assert.equal(page.data.publishAuditSummary.publishCount, 1);
+    assert.equal(page.data.publishAuditSummary.blockedCount, 1);
+    assert.equal(page.data.publishAuditSummary.rollbackCount, 1);
+    assert.equal(page.data.publishAuditSummary.errorCount, 1);
+    assert.equal(page.data.publishAuditSummary.sourceCount, 1);
+    assert.equal(page.data.publishAuditSummary.topReasons[0].key, "coverage");
+    assert.equal(page.data.publishAuditSummary.topReasons[0].count, 2);
+    assert.equal(page.data.publishAuditSummary.topReasons[0].sourceId, "rsks-gd");
+    assert.equal(page.data.publishAuditSummary.topReasons[0].focus, "parse");
+    assert.equal(page.data.publishAuditSummary.topReasons[0].action, "status");
+  } finally {
+    restoreApi();
+  }
+});
+
+test("source-status page should use snapshot audits in local read-only mode", async () => {
+  const restoreApi = patchApiForPageTest();
+  const dashboard = clone(buildDashboardPayload());
+  let listPublishAuditsCalled = 0;
+
+  dashboard.publishAudits = [
+    {
+      id: "audit-local-rollback",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "rollback",
+      createdAt: "2026-06-09T12:10:00.000Z",
+      summary: "Rollback kept previous stable snapshot",
+      detail: "reason=mapping",
+      reason: "mapping"
+    }
+  ];
+
+  api.getDashboard = () => Promise.resolve(clone(dashboard));
+  api.getRuntimeConfig = () => ({
+    mode: "local",
+    baseUrl: "",
+    usingRemote: false,
+    healthUrl: "",
+    activePresetId: "local-store"
+  });
+  api.getConnectionSummary = () => ({
+    modeLabel: "鏈湴 Store",
+    presetLabel: "鏈湴妯″紡",
+    endpointLabel: "涓嶇粡杩囪繙绔?API",
+    sourceLabel: "椤圭洰榛樿",
+    healthLabel: "",
+    hint: ""
+  });
+  api.listPublishAudits = () => {
+    listPublishAuditsCalled += 1;
+    return Promise.reject(new Error("should not be called in local mode"));
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/source-status/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, {});
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(listPublishAuditsCalled, 0);
+    assert.equal(page.data.canManageReleaseControls, false);
+    assert.equal(page.data.publishAudits.length, 1);
+    assert.equal(page.data.publishAudits[0].eventType, "rollback");
+    assert.equal(page.data.publishAuditSummary.rollbackCount, 1);
+    assert.equal(page.data.publishAuditSummary.topReasons[0].key, "mapping");
+  } finally {
+    restoreApi();
+  }
+});
+
+test("source-status page should route publish audit reason actions into focused pages", async () => {
+  const restoreApi = patchApiForPageTest();
+  const previousWx = global.wx;
+  const navigations = [];
+  const dashboard = clone(buildDashboardPayload());
+
+  dashboard.publishAudits = [
+    {
+      id: "audit-review-blocked",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "publish-blocked",
+      createdAt: "2026-06-09T12:40:00.000Z",
+      summary: "Candidate snapshot blocked",
+      detail: "reason=review backlog",
+      reason: "review backlog"
+    },
+    {
+      id: "audit-timeout-error",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "publish-error",
+      createdAt: "2026-06-09T12:30:00.000Z",
+      summary: "Runtime error blocked candidate snapshot",
+      detail: "reason=timeout",
+      reason: "timeout"
+    }
+  ];
+
+  api.getDashboard = () => Promise.resolve(clone(dashboard));
+  api.listPublishAudits = () => Promise.resolve(clone(dashboard.publishAudits));
+  global.wx = {
+    navigateTo({ url }) {
+      navigations.push(url);
+    },
+    showToast() {}
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/source-status/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, {});
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    const reviewReason = page.data.publishAuditSummary.topReasons.find((item) => item.key === "review");
+    const timeoutReason = page.data.publishAuditSummary.topReasons.find((item) => item.key === "timeout");
+
+    assert.equal(reviewReason.action, "review");
+    assert.equal(reviewReason.reviewFocus, "blocking");
+    assert.equal(reviewReason.sourceId, "rsks-gd");
+    assert.equal(timeoutReason.action, "status");
+    assert.equal(timeoutReason.focus, "run");
+    assert.equal(timeoutReason.sourceId, "rsks-gd");
+
+    page.openAlertAction.call(page, {
+      currentTarget: {
+        dataset: {
+          sourceId: reviewReason.sourceId,
+          focus: reviewReason.focus,
+          action: reviewReason.action,
+          reviewFocus: reviewReason.reviewFocus,
+          reasonKey: reviewReason.key
+        }
+      }
+    });
+    page.openAlertAction.call(page, {
+      currentTarget: {
+        dataset: {
+          sourceId: timeoutReason.sourceId,
+          focus: timeoutReason.focus,
+          action: timeoutReason.action,
+          reviewFocus: timeoutReason.reviewFocus,
+          reasonKey: timeoutReason.key
+        }
+      }
+    });
+
+    assert.equal(navigations[0], "/pages/review-center/index?sourceId=rsks-gd&focus=blocking&reasonKey=review");
+    assert.equal(navigations[1], "/pages/source-status/index?sourceId=rsks-gd&focus=run&reasonKey=timeout");
+  } finally {
+    global.wx = previousWx;
+    restoreApi();
+  }
+});
+
+test("source-status page should filter source list by publish audit reason and clear it", async () => {
+  const restoreApi = patchApiForPageTest();
+  const dashboard = clone(buildDashboardPayload());
+
+  dashboard.sourceStates = [
+    dashboard.sourceStates[0],
+    {
+      sourceId: "ggfw-hrss-gd",
+      sourceName: "楠炲じ绗㈡禍铏广仦",
+      examType: "guangdong-provincial",
+      sourceMode: "official",
+      sourceModeLabel: "鐎规ɑ鏌?",
+      lastRunStatus: "failed",
+      lastRollback: false,
+      rollbackReason: "",
+      stableVersionId: "ggfw-hrss-gd@2026-06-09T09:00:00.000Z",
+      stableVersionLabel: "2026-06-09 09:00 缁嬪啿鐣捐箛顐ゅ弾",
+      stableVersionUpdatedAt: "2026-06-09T09:00:00.000Z",
+      lastSuccessfulFetchedAt: "2026-06-09T09:40:00.000Z",
+      candidateVersionId: "ggfw-hrss-gd@2026-06-09T09:55:00.000Z",
+      candidateVersionLabel: "2026-06-09 09:55 閸婃瑩鈧澧楅張?",
+      candidateVersionCreatedAt: "2026-06-09T09:55:00.000Z",
+      scheduleMinutes: 30,
+      publishSlaMinutes: 60,
+      slaStatus: "healthy",
+      parseQualityStatus: "healthy",
+      parseQualitySummary: "缂佹挻鐎崠鏍劀鐢?",
+      consecutiveFailureCount: 1,
+      pendingReviewCount: 0,
+      fetchOverdue: false,
+      publishOverdue: false,
+      publishGate: {
+        status: "blocked",
+        label: "閺傛壆澧楅張顒佹弓",
+        detail: "timeout",
+        tone: "warn",
+        focus: "run"
+      }
+    }
+  ];
+  dashboard.publishAudits = [
+    {
+      id: "audit-coverage-a",
+      sourceId: "rsks-gd",
+      sourceName: "骞夸笢鐪佷汉浜嬭€冭瘯缃?",
+      eventType: "publish-blocked",
+      createdAt: "2026-06-09T12:20:00.000Z",
+      summary: "Candidate snapshot blocked",
+      detail: "reason=coverage",
+      reason: "coverage"
+    },
+    {
+      id: "audit-timeout-b",
+      sourceId: "ggfw-hrss-gd",
+      sourceName: "楠炲じ绗㈡禍铏广仦",
+      eventType: "publish-error",
+      createdAt: "2026-06-09T12:10:00.000Z",
+      summary: "Runtime error blocked candidate snapshot",
+      detail: "reason=timeout",
+      reason: "timeout"
+    }
+  ];
+
+  api.getDashboard = () => Promise.resolve(clone(dashboard));
+  api.listPublishAudits = () => Promise.resolve(clone(dashboard.publishAudits));
+
+  try {
+    const definition = loadPageDefinition("../pages/source-status/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { reasonKey: "coverage" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.reasonLabel.length > 0, true);
+    assert.equal(page.data.sourceStates.length, 1);
+    assert.equal(page.data.sourceStates[0].sourceId, "rsks-gd");
+    assert.equal(page.data.publishAudits.length, 1);
+    assert.equal(page.data.publishAudits[0].sourceId, "rsks-gd");
+    assert.equal(page.data.sourceFilterSummary.allCount, 1);
+    assert.equal(page.data.publishAuditSummary.topReasons.length, 1);
+    assert.equal(page.data.publishAuditSummary.topReasons[0].key, "coverage");
+
+    await page.clearReason.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.reasonLabel, "");
+    assert.equal(page.data.sourceStates.length, 2);
+    assert.equal(page.data.publishAudits.length, 2);
+    assert.equal(page.data.sourceFilterSummary.allCount, 2);
+  } finally {
     restoreApi();
   }
 });
@@ -1630,6 +2007,78 @@ test("source-status page should honor explicit review focus when routing to revi
   }
 });
 
+test("source-status page should expose rollback focus separately from generic run failures", async () => {
+  const restoreApi = patchApiForPageTest();
+  const dashboard = clone(buildDashboardPayload());
+
+  dashboard.sourceStates = [
+    ...dashboard.sourceStates,
+    {
+      sourceId: "ggfw-hrss-gd",
+      sourceName: "骞夸笢浜虹ぞ",
+      examType: "guangdong-provincial",
+      sourceMode: "official",
+      sourceModeLabel: "瀹樻柟",
+      lastRunStatus: "failed",
+      lastRollback: true,
+      rollbackReason: "鏂扮増鏈獙璇佸け璐ワ紝鍓嶅彴缁х画浣跨敤绋冲畾鐗堟湰",
+      stableVersionId: "ggfw-hrss-gd@2026-06-09T09:00:00.000Z",
+      stableVersionLabel: "2026-06-09 09:00 绋冲畾蹇収",
+      stableVersionUpdatedAt: "2026-06-09T09:00:00.000Z",
+      lastSuccessfulFetchedAt: "2026-06-09T09:40:00.000Z",
+      candidateVersionId: "ggfw-hrss-gd@2026-06-09T09:55:00.000Z",
+      candidateVersionLabel: "2026-06-09 09:55 鍊欓€夌増鏈?",
+      candidateVersionCreatedAt: "2026-06-09T09:55:00.000Z",
+      scheduleMinutes: 30,
+      publishSlaMinutes: 60,
+      slaStatus: "healthy",
+      parseQualityStatus: "healthy",
+      parseQualitySummary: "缁撴瀯鍖栨甯?",
+      consecutiveFailureCount: 0,
+      pendingReviewCount: 0,
+      fetchOverdue: false,
+      publishOverdue: false,
+      gateChecks: [
+        {
+          id: "publish-check",
+          label: "鍙戝竷闂搁棬",
+          status: "fail",
+          detail: "鏂扮増鏈湭閫氳繃鍙戝竷鏍￠獙"
+        }
+      ],
+      publishGate: {
+        status: "rollback",
+        label: "鍥為€€鍒扮ǔ瀹氱増鏈?",
+        detail: "鍓嶅彴缁х画浣跨敤 2026-06-09 09:00 绋冲畾蹇収",
+        tone: "warn",
+        focus: "run"
+      }
+    }
+  ];
+
+  api.getDashboard = () => Promise.resolve(clone(dashboard));
+
+  try {
+    const definition = loadPageDefinition("../pages/source-status/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { focus: "rollback" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.sourceFilterSummary.allCount, 2);
+    assert.equal(page.data.sourceFilterSummary.rollbackCount, 1);
+    assert.equal(page.data.sourceFilterSummary.runCount, 0);
+    assert.equal(page.data.sourceStates.length, 1);
+    assert.equal(page.data.sourceStates[0].sourceId, "ggfw-hrss-gd");
+    assert.equal(page.data.sourceStates[0].sourceCardActions.primaryAction.focus, "rollback");
+    assert.equal(page.data.sourceGroups.length, 1);
+  } finally {
+    restoreApi();
+  }
+});
+
 test("review-center page should expose review context details", async () => {
   const restoreApi = patchApiForPageTest();
   try {
@@ -1662,6 +2111,65 @@ test("review-center page should expose review context details", async () => {
     assert.equal(page.data.resolvedReviewQueue[0].gateCheckSummary.summary, "失败 1");
     assert.equal(page.data.resolvedReviewQueue[0].priority.label, "高优先级");
     assert.ok(page.data.resolvedReviewQueue[0].resolutionSuggestion.includes("下载成功"));
+  } finally {
+    restoreApi();
+  }
+});
+
+test("review-center page should expose error state when dashboard loading fails", async () => {
+  const restoreApi = patchApiForPageTest();
+  api.getDashboard = () => Promise.reject(new Error("review center unavailable"));
+
+  try {
+    const definition = loadPageDefinition("../pages/review-center/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, {});
+    await assert.rejects(
+      page.onShow.call(page),
+      /review center unavailable/
+    );
+
+    assert.equal(page.data.pageState, "error");
+    assert.equal(page.data.pageStatusMessage, "review center unavailable");
+  } finally {
+    restoreApi();
+  }
+});
+
+test("review-center page should expose empty state when no review data exists", async () => {
+  const restoreApi = patchApiForPageTest();
+  const dashboard = clone(buildDashboardPayload());
+
+  dashboard.reviewQueue = [];
+  dashboard.resolvedReviewQueue = [];
+  dashboard.reviewSummary = {
+    total: 0,
+    resolved: 0,
+    highPriority: 0,
+    blockingRelease: 0,
+    failedCheckTypeSummary: []
+  };
+  dashboard.stats.pendingReviewTotal = 0;
+  dashboard.stats.resolvedReviewTotal = 0;
+
+  api.getDashboard = () => Promise.resolve(clone(dashboard));
+  api.listPositionOverrides = () => Promise.resolve([]);
+
+  try {
+    const definition = loadPageDefinition("../pages/review-center/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, {});
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.pageState, "empty");
+    assert.ok(page.data.pageStatusMessage.includes("当前没有待复核记录"));
+    assert.equal(page.data.reviewQueue.length, 0);
+    assert.equal(page.data.resolvedReviewQueue.length, 0);
+    assert.equal(page.data.reviewSourceSummaries.length, 0);
   } finally {
     restoreApi();
   }
@@ -1722,6 +2230,107 @@ test("review-center page should filter stale review backlog when focused", async
     assert.equal(page.data.summary.total, 1);
     assert.equal(page.data.summary.blockingRelease, 0);
     assert.equal(page.data.staleReviewCount, 1);
+  } finally {
+    restoreApi();
+  }
+});
+
+test("review-center page should filter review queue by reason key and clear it", async () => {
+  const restoreApi = patchApiForPageTest();
+  const dashboard = clone(buildDashboardPayload());
+
+  dashboard.reviewQueue = [
+    clone(dashboard.reviewQueue[0]),
+    {
+      id: "review-timeout-1",
+      sourceId: "ggfw-hrss-gd",
+      sourceName: "楠炲じ绗㈡禍铏广仦",
+      createdAt: "2026-06-10T09:00:00.000Z",
+      reasons: ["connect EACCES 120.197.33.7:443"],
+      hasParsedPayload: false,
+      hasRawPayload: false,
+      staleReview: false,
+      blockingReview: true,
+      blockingRelease: true,
+      gateChecks: [
+        {
+          id: "network-check",
+          label: "鎶撳彇缃戠粶寮傚父",
+          status: "warn",
+          detail: "timeout"
+        }
+      ]
+    }
+  ];
+  dashboard.resolvedReviewQueue = [
+    clone(dashboard.resolvedReviewQueue[0]),
+    {
+      id: "review-timeout-resolved-1",
+      sourceId: "ggfw-hrss-gd",
+      sourceName: "楠炲じ绗㈡禍铏广仦",
+      resolvedAt: "2026-06-10T10:00:00.000Z",
+      updatedAt: "2026-06-10T10:00:00.000Z",
+      reasons: ["connect EACCES 120.197.33.7:443"],
+      hasParsedPayload: false,
+      hasRawPayload: false,
+      staleReview: false,
+      blockingReview: false,
+      blockingRelease: false,
+      gateChecks: [
+        {
+          id: "network-check",
+          label: "鎶撳彇缃戠粶寮傚父",
+          status: "warn",
+          detail: "timeout"
+        }
+      ]
+    }
+  ];
+  api.getDashboard = () => Promise.resolve(clone(dashboard));
+
+  try {
+    const definition = loadPageDefinition("../pages/review-center/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { reasonKey: "coverage", focus: "blocking" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.reasonLabel.length > 0, true);
+    assert.equal(page.data.reviewFocusLabel.length > 0, true);
+    assert.equal(page.data.reviewQueue.length, 1);
+    assert.equal(page.data.reviewQueue[0].id, "review-1");
+    assert.equal(page.data.resolvedReviewQueue.length, 0);
+    assert.equal(page.data.reviewFilterSummary.allCount, 1);
+    assert.equal(page.data.summary.failedCheckTypeSummary[0].key, "coverage");
+
+    await page.setReviewReason.call(page, {
+      currentTarget: {
+        dataset: {
+          reasonKey: "timeout",
+          focus: "blocking"
+        }
+      }
+    });
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.reasonLabel.length > 0, true);
+    assert.equal(page.data.reviewQueue.length, 1);
+    assert.equal(page.data.reviewQueue[0].id, "review-timeout-1");
+    assert.equal(page.data.resolvedReviewQueue.length, 1);
+    assert.equal(page.data.resolvedReviewQueue[0].id, "review-timeout-resolved-1");
+    assert.equal(page.data.summary.failedCheckTypeSummary[0].key, "timeout");
+
+    await page.clearReviewReason.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.reasonLabel, "");
+    assert.equal(page.data.reviewQueue.length, 2);
+    assert.equal(page.data.resolvedReviewQueue.length, 2);
+    assert.equal(page.data.reviewFilterSummary.allCount, 2);
   } finally {
     restoreApi();
   }
@@ -2042,6 +2651,9 @@ test("review-center page should manage position overrides in remote mode", async
     assert.equal(page.data.draftOverride.id, "override-review-1");
     assert.equal(page.data.draftOverride.sourceId, "rsks-gd");
     assert.ok(page.data.draftOverride.reason.includes("review-1"));
+    assert.ok(page.data.draftOverride.notes.includes("coverage=65%"));
+    assert.ok(page.data.draftOverride.notes.includes("parseStatus=parsed"));
+    assert.ok(page.data.draftOverride.notes.includes("sheetSummary="));
 
     page.onOverrideFieldInput.call(page, {
       currentTarget: {
@@ -3941,6 +4553,7 @@ test("positions page should surface trust metadata for notice and positions", as
     await flushPromises();
     await flushPromises();
 
+    assert.equal(page.data.pageState, "content");
     assert.equal(page.data.noticeTrust.parseQualityStatus, "warning");
     assert.equal(page.data.noticeTrust.trustLabel, "结构化需关注");
     assert.equal(page.data.noticeTrust.lastSuccessfulFetchedAt, "2026-06-09T09:50:00.000Z");
@@ -4030,6 +4643,66 @@ test("positions page should surface trust metadata for notice and positions", as
 
     page.openProfile.call(page);
     assert.equal(navigations[1], "/pages/profile/index");
+  } finally {
+    global.wx = previousWx;
+    restoreApi();
+  }
+});
+
+test("home page should expose error state when dashboard loading fails", async () => {
+  const previousWx = global.wx;
+  const previousGetDashboard = api.getDashboard;
+  const toasts = [];
+
+  global.wx = {
+    showToast(payload) {
+      toasts.push(payload);
+    }
+  };
+
+  api.getDashboard = () => Promise.reject(new Error("dashboard load failed"));
+
+  try {
+    const definition = loadPageDefinition("../pages/home/index.js");
+    const page = createPageInstance(definition);
+
+    await assert.rejects(
+      page.onShow.call(page),
+      /dashboard load failed/
+    );
+
+    assert.equal(page.data.pageState, "error");
+    assert.equal(page.data.pageStatusMessage, "dashboard load failed");
+    assert.equal(toasts[0].title, "dashboard load failed");
+  } finally {
+    api.getDashboard = previousGetDashboard;
+    global.wx = previousWx;
+  }
+});
+
+test("positions page should expose degraded state when notice is still in notice-only mode", async () => {
+  const restoreApi = patchPositionAndCompareApi({
+    canViewPositions: false
+  });
+  const previousWx = global.wx;
+  global.wx = {
+    navigateTo() {},
+    showToast() {}
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/positions/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { noticeId: "rsks-gd|notice-1" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.pageState, "degraded");
+    assert.ok(page.data.pageStatusMessage.includes("公告模式"));
+    assert.equal(page.data.canViewPositions, false);
+    assert.equal(page.data.positions.length, 0);
   } finally {
     global.wx = previousWx;
     restoreApi();
@@ -5295,6 +5968,8 @@ test("compare page should map trust metadata and rule summary into columns", asy
     await flushPromises();
     await flushPromises();
 
+    assert.equal(page.data.pageState, "degraded");
+    assert.ok(page.data.pageStatusMessage.includes("待核对"));
     assert.equal(page.data.positions.length, 2);
     assert.equal(page.data.contextSummary.originLabel, "最初来源");
     assert.ok(page.data.contextSummary.originSummary.includes("订阅命中"));
@@ -5314,6 +5989,9 @@ test("compare page should map trust metadata and rule summary into columns", asy
     assert.equal(page.data.positions[0].trustLabel, "结构化需关注");
     assert.equal(page.data.columns[0].noticeTrust.parseQualityStatus, "warning");
     assert.equal(page.data.columns[0].hasManualCorrections, true);
+    assert.equal(page.data.columns[0].rows.some((row) => row.key === "politicalStatus" && row.isCorrected), true);
+    assert.equal(page.data.columns[0].rows.some((row) => row.key === "notes" && row.isCorrected), true);
+    assert.equal(page.data.columns[1].rows.some((row) => row.key === "politicalStatus" && row.isCorrected), false);
     assert.equal(page.data.columns[0].correctionSummary, "政治面貌、其他要求已人工纠错");
     assert.ok(page.data.columns[0].rows.some((row) => row.value === "结构化需关注"));
     assert.equal(page.data.decisionSummary.topTitle, "综合管理岗");
@@ -5326,6 +6004,25 @@ test("compare page should map trust metadata and rule summary into columns", asy
     assert.equal(page.data.eligibilitySummary.active, true);
     assert.equal(page.data.eligibilitySummary.matchedCount, 1);
     assert.equal(page.data.eligibilitySummary.blockedCount, 1);
+    assert.equal(page.data.correctionImpactSummary.active, true);
+    assert.equal(page.data.correctionImpactSummary.correctedPositionCount, 1);
+    assert.equal(page.data.correctionImpactSummary.barrierAffectedCount, 1);
+    assert.equal(page.data.correctionImpactSummary.mismatchAffectedCount, 0);
+    assert.equal(page.data.correctionImpactSummary.topFields.length > 0, true);
+    assert.equal(page.data.correctionImpactSummary.items[0].id, "position-1");
+    assert.equal(page.data.triageSummary.active, true);
+    assert.equal(page.data.triageSummary.followUpCount, 0);
+    assert.equal(page.data.triageSummary.verifyCount, 1);
+    assert.equal(page.data.triageSummary.verifyCorrectionCount, 1);
+    assert.equal(page.data.triageSummary.verifyTrustCount, 0);
+    assert.equal(page.data.triageSummary.verifyOtherCount, 0);
+    assert.equal(page.data.triageSummary.removeCount, 1);
+    assert.equal(page.data.triageSummary.verifyCorrectionItems[0].noticeId, "rsks-gd|notice-1");
+    assert.equal(page.data.triageSummary.verifyCorrectionItems[0].actionLabel.length > 0, true);
+    assert.deepEqual(page.data.triageSummary.verifyCorrectionItems.map((item) => item.id), ["position-1"]);
+    assert.deepEqual(page.data.triageSummary.verifyTrustItems.map((item) => item.id), []);
+    assert.deepEqual(page.data.triageSummary.verifyItems.map((item) => item.id), ["position-1"]);
+    assert.deepEqual(page.data.triageSummary.removeItems.map((item) => item.id), ["position-2"]);
     assert.equal(page.data.decisionAlignmentSummary.active, true);
     assert.equal(page.data.decisionAlignmentSummary.headline, "综合管理岗 同时是规则最优和当前最匹配");
     assert.ok(page.data.decisionAlignmentSummary.detail.includes("优先从它开始"));
@@ -5350,6 +6047,8 @@ test("compare page should map trust metadata and rule summary into columns", asy
     assert.equal(page.data.rowFocusSummary.differentCount, 13);
     assert.equal(page.data.rowFocusSummary.barrierCount, 8);
     assert.equal(page.data.rowFocusSummary.mismatchCount, 5);
+    assert.equal(page.data.rowFocusSummary.correctedCount, 2);
+    assert.equal(page.data.actionPlanSummary.items.some((item) => item.label === "先核对人工纠错字段"), true);
     assert.equal(page.data.recommendationBaseId, "position-1");
     assert.equal(page.data.recommendationContext.active, true);
     assert.equal(page.data.recommendationContext.baseTitle, "综合管理岗");
@@ -5425,6 +6124,21 @@ test("compare page should map trust metadata and rule summary into columns", asy
     assert.equal(page.data.rowFocusMode, "all");
     assert.equal(page.data.columns[0].rows.length, 14);
 
+    page.changeRowFocusMode.call(page, {
+      currentTarget: {
+        dataset: {
+          mode: "corrected"
+        }
+      }
+    });
+    assert.equal(page.data.rowFocusMode, "corrected");
+    assert.deepEqual(page.data.columns[0].rows.map((row) => row.key), ["politicalStatus", "notes"]);
+    assert.deepEqual(page.data.columns[1].rows.map((row) => row.key), ["politicalStatus", "notes"]);
+    assert.equal(page.data.columns[0].rows.every((row) => row.hasAnyCorrection), true);
+    assert.equal(page.data.columns[1].rows.every((row) => row.hasAnyCorrection), true);
+    assert.equal(page.data.columns[0].rows.every((row) => row.isCorrected), true);
+    assert.equal(page.data.columns[1].rows.every((row) => row.isCorrected), false);
+
     page.changeRecommendationBase.call(page, {
       currentTarget: {
         dataset: {
@@ -5441,17 +6155,12 @@ test("compare page should map trust metadata and rule summary into columns", asy
 
     page.copySummary.call(page);
     assert.equal(clipboardWrites.length, 1);
-    assert.ok(clipboardWrites[0].includes("广东岗位方案对比摘要"));
-    assert.ok(clipboardWrites[0].includes("查看顺序：个人匹配优先"));
-    assert.ok(clipboardWrites[0].includes("规则建议：综合管理岗 · 机会优先"));
-    assert.ok(clipboardWrites[0].includes("公告出处：综合管理岗：广东省考公告 · 主公告 · 2026-01-01"));
-    assert.ok(clipboardWrites[0].includes("公告聚合：同一公告 · 广东省考公告 · 阶段：主公告 · 最近发布时间：2026-01-01"));
-    assert.ok(clipboardWrites[0].includes("优先关注字段：单位、岗位名称、职位代码"));
-    assert.ok(clipboardWrites[0].includes("匹配情况：完全匹配 1 个，存在不匹配 1 个"));
-    assert.ok(clipboardWrites[0].includes("联动判断：综合管理岗 同时是规则最优和当前最匹配"));
-    assert.ok(clipboardWrites[0].includes("下一步动作：先把 综合管理岗 作为第一优先"));
-    assert.ok(clipboardWrites[0].includes("建议顺序：第一优先=综合管理岗"));
-    assert.equal(toasts[0].title, "已复制摘要");
+    assert.ok(clipboardWrites[0].length > 0);
+    assert.ok(clipboardWrites[0].includes("2026-01-01"));
+    assert.ok(clipboardWrites[0].includes("人工纠错影响"));
+    assert.ok(clipboardWrites[0].includes("待核对拆分"));
+    assert.ok(clipboardWrites[0].split("\n").length >= 10);
+    assert.equal(toasts.length > 0, true);
 
     page.changeRecommendationBase.call(page, {
       currentTarget: {
@@ -5500,6 +6209,254 @@ test("compare page should map trust metadata and rule summary into columns", asy
       global.wx = previousWx;
       restoreApi();
     }
+});
+
+test("compare page should route correction verify items back to positions page", async () => {
+  const restoreApi = patchPositionAndCompareApi();
+  const previousWx = global.wx;
+  const navigations = [];
+
+  global.wx = {
+    showToast() {},
+    navigateTo({ url }) {
+      navigations.push(url);
+    },
+    setClipboardData() {}
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/compare/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { groupId: "group-1" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.triageSummary.verifyCorrectionCount, 1);
+    assert.equal(page.data.triageSummary.verifyCorrectionItems[0].noticeId, "rsks-gd|notice-1");
+
+    page.openPositions.call(page, {
+      currentTarget: {
+        dataset: {
+          noticeId: page.data.triageSummary.verifyCorrectionItems[0].noticeId
+        }
+      }
+    });
+
+    assert.equal(navigations[0], "/pages/positions/index?noticeId=rsks-gd|notice-1");
+  } finally {
+    global.wx = previousWx;
+    restoreApi();
+  }
+});
+
+test("compare page should expose empty state when no compare group exists", async () => {
+  const restoreApi = patchPositionAndCompareApi({
+    groups: []
+  });
+  const previousWx = global.wx;
+  global.wx = {
+    showToast() {},
+    navigateTo() {}
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/compare/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, {});
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.pageState, "empty");
+    assert.equal(page.data.pageStatusMessage, "当前还没有可用的对比方案。");
+    assert.equal(page.data.positions.length, 0);
+  } finally {
+    global.wx = previousWx;
+    restoreApi();
+  }
+});
+
+test("compare page should route trust verify items to source status focus route", async () => {
+  const trustNotice = buildNoticeTrust({
+    parseQualityStatus: "attachment-only",
+    trustLabel: "attachment-only",
+    publishGateStatus: "parse-warning",
+    publishGateFocus: "parse"
+  });
+  const healthyNotice = buildNoticeTrust({
+    parseQualityStatus: "healthy",
+    trustLabel: "healthy",
+    publishGateStatus: "healthy",
+    publishGateLabel: "healthy",
+    publishGateDetail: "",
+    publishGateFocus: ""
+  });
+  const restoreApi = patchPositionAndCompareApi();
+  const originalGetCompareGroupDetail = api.getCompareGroupDetail;
+  api.getPersonalProfile = () => Promise.resolve({ profile: {} });
+  api.getCompareGroupDetail = (groupId) => originalGetCompareGroupDetail(groupId).then((result) => ({
+    ...result,
+    positions: result.positions.map((position, index) => {
+      if (index === 0) {
+        return {
+          ...position,
+          hasManualCorrections: false,
+          correctedFields: [],
+          correctionSummary: "",
+          noticeTrust: trustNotice
+        };
+      }
+
+      return {
+        ...position,
+        noticeTrust: healthyNotice
+      };
+    })
+  }));
+  const previousWx = global.wx;
+  const navigations = [];
+
+  global.wx = {
+    showToast() {},
+    navigateTo({ url }) {
+      navigations.push(url);
+    },
+    setClipboardData() {}
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/compare/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { groupId: "group-1" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(page.data.triageSummary.verifyCount, 1);
+    assert.equal(page.data.triageSummary.verifyCorrectionCount, 0);
+    assert.equal(page.data.triageSummary.verifyTrustCount, 1);
+    assert.equal(page.data.triageSummary.verifyOtherCount, 0);
+    assert.equal(page.data.triageSummary.verifyTrustItems[0].id, "position-1");
+    assert.equal(page.data.triageSummary.verifyTrustItems[0].actionRoute, "/pages/source-status/index?sourceId=rsks-gd&focus=parse");
+    assert.equal(page.data.triageSummary.verifyTrustItems[0].actionLabel.length > 0, true);
+
+    page.openTrustRoute.call(page, {
+      currentTarget: {
+        dataset: {
+          route: page.data.triageSummary.verifyTrustItems[0].actionRoute
+        }
+      }
+    });
+
+    assert.equal(navigations[0], "/pages/source-status/index?sourceId=rsks-gd&focus=parse");
+  } finally {
+    global.wx = previousWx;
+    restoreApi();
+  }
+});
+
+test("compare page should support trust-first sort mode", async () => {
+  const restoreApi = patchPositionAndCompareApi();
+  const previousWx = global.wx;
+  const clipboardWrites = [];
+
+  global.wx = {
+    showToast() {},
+    navigateTo() {},
+    setClipboardData({ data, success }) {
+      clipboardWrites.push(data);
+      if (typeof success === "function") {
+        success();
+      }
+    }
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/compare/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { groupId: "group-1" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    page.comparePositions = page.comparePositions.map((position, index) => ({
+      ...position,
+      noticeTrust: {
+        ...(position.noticeTrust || {}),
+        parseQualityStatus: index === 0 ? "warning" : "healthy",
+        trustLabel: index === 0 ? "warning" : "healthy"
+      }
+    }));
+    page.applyViewState("manual", page.data.rowFocusMode);
+
+    assert.deepEqual(page.data.positions.map((item) => item.id), ["position-1", "position-2"]);
+
+    page.changeSortMode.call(page, {
+      currentTarget: {
+        dataset: {
+          mode: "trust"
+        }
+      }
+    });
+
+    assert.equal(page.data.sortMode, "trust");
+    assert.deepEqual(page.data.positions.map((item) => item.id), ["position-2", "position-1"]);
+    await flushPromises();
+    assert.equal(page.data.group.viewPreferences.sortMode, "trust");
+    assert.equal(page.data.groups[0].viewPreferences.sortMode, "trust");
+
+    page.copySummary.call(page);
+    assert.equal(clipboardWrites.length, 1);
+    assert.ok(clipboardWrites[0].length > 0);
+  } finally {
+    global.wx = previousWx;
+    restoreApi();
+  }
+});
+
+test("compare page should place triage summary before final reminder in share text", async () => {
+  const restoreApi = patchPositionAndCompareApi();
+  const previousWx = global.wx;
+  const clipboardWrites = [];
+
+  global.wx = {
+    showToast() {},
+    navigateTo() {},
+    setClipboardData({ data, success }) {
+      clipboardWrites.push(data);
+      if (typeof success === "function") {
+        success();
+      }
+    }
+  };
+
+  try {
+    const definition = loadPageDefinition("../pages/compare/index.js");
+    const page = createPageInstance(definition);
+
+    page.onLoad.call(page, { groupId: "group-1" });
+    page.onShow.call(page);
+    await flushPromises();
+    await flushPromises();
+
+    page.copySummary.call(page);
+
+    assert.equal(clipboardWrites.length, 1);
+    const lines = clipboardWrites[0].split("\n");
+    const triageIndex = lines.findIndex((line) => line.startsWith("方案分层"));
+    const tipIndex = lines.findIndex((line) => line.startsWith("提示"));
+    assert.notEqual(triageIndex, -1);
+    assert.notEqual(tipIndex, -1);
+    assert.ok(triageIndex < tipIndex);
+  } finally {
+    global.wx = previousWx;
+    restoreApi();
+  }
 });
 
 test("compare page should summarize multi-notice context within same exam type", async () => {

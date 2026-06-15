@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const store = require("../utils/store");
+const demoSnapshot = require("../data/demo");
 const { installTestSeed } = require("./fixtures/test-seed");
 
 function getGuangdongNotice() {
@@ -24,6 +25,19 @@ test.beforeEach(() => {
 
 test.afterEach(() => {
   store.__resetStateForTests();
+});
+
+test("store should support forcing the lightweight demo snapshot for bundle-safe runtime", () => {
+  store.__setSeedSnapshotLoaderForTests(null);
+  store.__setRuntimeSeedModeForTests("demo");
+
+  const notices = store.listNotices();
+
+  assert.equal(notices.length, demoSnapshot.notices.length);
+  assert.deepEqual(
+    notices.map((item) => item.id).sort(),
+    demoSnapshot.notices.map((item) => item.id).sort()
+  );
 });
 
 test("saveFilterScheme should persist a reusable filter with live match counts", () => {
@@ -614,12 +628,12 @@ test("compare groups should support rename, delete and cross-exam guard", () => 
   assert.equal(renamed.name, "广州优先方案");
 
   const withPreferences = store.saveCompareGroupPreferences(group.id, {
-    sortMode: "eligibility",
+    sortMode: "trust",
     rowFocusMode: "barrier"
   });
-  assert.equal(withPreferences.viewPreferences.sortMode, "eligibility");
+  assert.equal(withPreferences.viewPreferences.sortMode, "trust");
   assert.equal(withPreferences.viewPreferences.rowFocusMode, "barrier");
-  assert.equal(store.getCompareGroup(group.id).viewPreferences.sortMode, "eligibility");
+  assert.equal(store.getCompareGroup(group.id).viewPreferences.sortMode, "trust");
 
   store.addPositionToCompareGroup(group.id, base.id);
   store.addPositionToCompareGroup(group.id, sameExam.id);
@@ -633,6 +647,48 @@ test("compare groups should support rename, delete and cross-exam guard", () => 
   const groups = store.deleteCompareGroup(group.id);
   assert.ok(groups.length > 0);
   assert.ok(!groups.some((item) => item.id === group.id));
+});
+
+test("deleteCompareGroup should restore seeded compare groups when the last group is removed", () => {
+  const seededGroup = {
+    id: "seeded-group-only",
+    name: "榛樿鏂规",
+    examType: "guangdong-provincial",
+    positionIds: [],
+    viewPreferences: {
+      sortMode: "manual",
+      rowFocusMode: "all"
+    },
+    originContext: null,
+    lastActionContext: null,
+    isPinned: false,
+    pinnedAt: "",
+    lastUsedAt: ""
+  };
+
+  store.__setSeedSnapshotLoaderForTests(() => ({
+    seedVersion: "seeded-compare-group-delete",
+    seed: {
+      updatedAt: "2026-06-11T10:00:00.000Z",
+      notices: [],
+      positions: [],
+      sourceStates: [],
+      reviewQueue: [],
+      resolvedReviewQueue: [],
+      alertEvents: [],
+      publishAudits: [],
+      compareGroups: [seededGroup]
+    }
+  }));
+  store.__hydrateUserStateForServer({
+    compareGroups: [seededGroup]
+  });
+
+  const groups = store.deleteCompareGroup("seeded-group-only");
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].id, "seeded-group-only");
+  assert.equal(groups[0].viewPreferences.sortMode, "manual");
 });
 
 test("compare groups should persist origin and last action context", () => {

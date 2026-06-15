@@ -7,7 +7,7 @@ const {
 const { formatTimestamp, resolveDate, mapSourceState } = require("./source-state");
 const { classifyReviewItem, summarizeReviewQueueBySource } = require("../review-analysis");
 
-function mapNotice(payload) {
+function mapNotice(payload, sourceState = null) {
   const batch = payload.batch || {};
   const stage = classifyNoticeStage({
     title: payload.notice.title,
@@ -20,7 +20,14 @@ function mapNotice(payload) {
     source: payload.source.name,
     noticeStageId: stage.id
   });
-  const hasStructuredPositions = batch.parseStatus !== "attachment-only" && payload.positions.length > 0;
+  const releaseMode = sourceState && sourceState.releaseMode
+    ? sourceState.releaseMode
+    : "";
+  const hasStructuredPositions = (
+    batch.parseStatus !== "attachment-only" &&
+    payload.positions.length > 0 &&
+    releaseMode !== "notice-only"
+  );
   const registrationWindow =
     payload.notice.registrationStart && payload.notice.registrationEnd
       ? `${payload.notice.registrationStart} - ${payload.notice.registrationEnd}`
@@ -213,13 +220,20 @@ function mapPublishAudit(item, sourceStateMap) {
 function exportWeappSnapshot(store, targetFile, options = {}) {
   const now = resolveDate(options.now) || new Date();
   const payloads = Array.from(store.production.values());
-  const notices = payloads.map(mapNotice);
+  const mappedSourceStates = store.listSourceStates().map((state) => mapSourceState(state, { now }));
+  const sourceStateById = Object.fromEntries(
+    mappedSourceStates.map((item) => [item.sourceId, item])
+  );
+  const notices = payloads.map((payload) => mapNotice(
+    payload,
+    sourceStateById[payload.notice.sourceId] || null
+  ));
   const positions = payloads.flatMap((payload) => payload.positions.map(mapPosition));
   const compareGroups = buildCompareGroups(positions);
   const noticeBySourceId = Object.fromEntries(notices.map((notice) => [notice.sourceId, notice]));
   const pendingReviewQueue = store.listReviewQueue();
-  const mappedSourceStates = store.listSourceStates().map((state) => {
-    const mapped = mapSourceState(state, { now });
+  const enrichedSourceStates = mappedSourceStates.map((state) => {
+    const mapped = state;
     const notice = noticeBySourceId[state.sourceId];
     if (!notice) {
       return mapped;
@@ -236,7 +250,7 @@ function exportWeappSnapshot(store, targetFile, options = {}) {
     };
   });
   const reviewSummaryBySource = summarizeReviewQueueBySource(pendingReviewQueue, mappedSourceStates);
-  const sourceStates = mappedSourceStates.map((item) => ({
+  const sourceStates = enrichedSourceStates.map((item) => ({
     ...item,
     blockingPendingReviewCount: reviewSummaryBySource[item.sourceId]?.blockingPendingCount || 0,
     stalePendingReviewCount: reviewSummaryBySource[item.sourceId]?.stalePendingCount || 0,

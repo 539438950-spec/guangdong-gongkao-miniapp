@@ -1,4 +1,25 @@
 <view class="page">
+  <view class="card" wx:if="{{pageState === 'loading'}}">
+    <view class="section-title">首页概览</view>
+    <view class="muted">{{pageStatusMessage || '正在加载首页概览...'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'error'}}">
+    <view class="section-title">首页概览</view>
+    <view class="muted">{{pageStatusMessage || '加载首页概览失败'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'empty'}}">
+    <view class="section-title">首页概览</view>
+    <view class="muted">{{pageStatusMessage || '当前还没有可展示的首页数据。'}}</view>
+  </view>
+
+  <block wx:elif="{{pageState === 'content' || pageState === 'degraded'}}">
+  <view class="card" wx:if="{{pageState === 'degraded' && pageStatusMessage}}">
+    <view class="section-title">状态提示</view>
+    <view class="muted">{{pageStatusMessage}}</view>
+  </view>
+
   <view class="hero">
     <view class="section-title">广东公考信息与选岗工具</view>
     <view>聚焦官方公告、岗位对比和高时效更新。</view>
@@ -79,15 +100,15 @@
       可直接发布 {{sourceSummary.publishableCount}} 个来源，受限 {{sourceSummary.restrictedCount}} 个，
       待复核 {{reviewSummary.total}} 条，阻塞发布 {{reviewSummary.blockingRelease}} 条。
     </view>
-    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceSummary.gateFailureTypeSummary.length}}">
+    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{sourceGateFailureTags.length}}">
       <view class="tag">高频失败</view>
-      <view class="tag" wx:for="{{sourceSummary.gateFailureTypeSummary.slice(0, 2)}}" wx:key="label">
+      <view class="tag" wx:for="{{sourceGateFailureTags}}" wx:key="label">
         {{item.label}} {{item.count}}
       </view>
     </view>
-    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{reviewSummary.failedCheckTypeSummary.length}}">
+    <view class="tag-row" style="margin-top: 12rpx;" wx:if="{{reviewFocusTags.length}}">
       <view class="tag">待复核重点</view>
-      <view class="tag tag-warn" wx:for="{{reviewSummary.failedCheckTypeSummary.slice(0, 2)}}" wx:key="label">
+      <view class="tag tag-warn" wx:for="{{reviewFocusTags}}" wx:key="label">
         {{item.label}} {{item.count}}
       </view>
     </view>
@@ -105,8 +126,8 @@
         <view class="muted" wx:if="{{item.decisionSummary}}" style="margin-top: 8rpx;">
           决策摘要：{{item.decisionSummary}}
         </view>
-        <view class="muted" wx:if="{{item.newPositionPreview && item.newPositionPreview.length}}" style="margin-top: 8rpx;">
-          新增岗位：{{item.newPositionPreview[0].title}}
+        <view class="muted" wx:if="{{item.firstNewPositionTitle}}" style="margin-top: 8rpx;">
+          新增岗位：{{item.firstNewPositionTitle}}
         </view>
         <view class="muted" wx:if="{{item.bestMatchSummary}}" style="margin-top: 8rpx;">
           优先看：{{item.bestMatchSummary}}
@@ -120,7 +141,7 @@
         <view class="tag-row" style="margin-top: 12rpx;">
           <view class="button secondary compact-button" data-id="{{item.id}}" data-notice-id="{{item.noticeId}}" bindtap="openSubscription">查看命中岗位</view>
           <view class="button secondary compact-button" data-id="{{item.id}}" bindtap="quickCompareSubscription">
-            {{item.compareActionLabel || (item.compareReady ? '直接对比新增命中' : '先去调整对比方案')}}
+            {{item.compareButtonLabel}}
           </view>
         </view>
       </view>
@@ -142,7 +163,7 @@
       <view class="list-item" data-id="{{item.id}}" bindtap="openLatestNotice">
         <view class="item-title">{{item.title}}</view>
         <view class="tag-row" style="margin-top: 12rpx;">
-          <view class="tag {{item.sourceMode === 'demo' ? 'tag-warn' : ''}}">{{item.sourceModeLabel}}</view>
+          <view class="tag {{item.sourceModeTagClass}}">{{item.sourceModeLabel}}</view>
           <view class="tag">{{item.area}}</view>
           <view class="tag">{{item.noticeStageLabel}}</view>
           <view class="tag {{item.availabilityTagClass}}">{{item.availabilityLabel}}</view>
@@ -198,7 +219,7 @@
       <view class="list-item">
         <view class="item-title">{{item.sourceName}}</view>
         <view class="tag-row" style="margin-top: 12rpx;">
-          <view class="tag {{item.sourceMode === 'demo' ? 'tag-warn' : ''}}">{{item.sourceModeLabel}}</view>
+          <view class="tag {{item.sourceModeTagClass}}">{{item.sourceModeLabel}}</view>
           <view class="tag {{item.publishGateTagClass}}" wx:if="{{item.publishGate && item.publishGate.label}}">
             {{item.publishGate.label}}
           </view>
@@ -207,7 +228,7 @@
         <view class="muted">最近抓取尝试：{{item.lastFetchedAt || '暂无'}}</view>
         <view class="muted">最近成功抓取：{{item.lastSuccessfulFetchedAt || '暂无'}}</view>
         <view class="muted">最近发布：{{item.lastPublishedAt || '暂无'}}</view>
-        <view class="muted">运行状态：{{item.lastRunStatus}}{{item.lastRollback ? ' · 已回退到稳定版本' : ''}}</view>
+        <view class="muted">运行状态：{{item.runStatusSummary}}</view>
         <view class="muted" wx:if="{{item.publishGate && item.publishGate.detail}}">发布说明：{{item.publishGate.detail}}</view>
         <view class="muted" wx:if="{{item.riskSummary && item.riskSummary.detail}}">风险摘要：{{item.riskSummary.detail}}</view>
         <view class="muted" wx:if="{{item.gateCheckSummary && item.gateCheckSummary.summary}}">校验摘要：{{item.gateCheckSummary.summary}}</view>
@@ -222,4 +243,5 @@
       </view>
     </block>
   </view>
+</block>
 </view>

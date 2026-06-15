@@ -171,9 +171,19 @@ class MemoryStore {
 
   listPublishAudits(sourceId) {
     return this.publishAudits
-      .map((item) => this.normalizePublishAudit(item))
+      .map((item, index) => ({
+        ...this.normalizePublishAudit(item),
+        _sortIndex: index
+      }))
       .filter((item) => !sourceId || item.sourceId === sourceId)
-      .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
+      .sort((left, right) => {
+        const createdAtGap = String(right.createdAt || "").localeCompare(String(left.createdAt || ""));
+        if (createdAtGap !== 0) {
+          return createdAtGap;
+        }
+        return right._sortIndex - left._sortIndex;
+      })
+      .map(({ _sortIndex, ...item }) => item);
   }
 
   closeReviewAlertsForSource(sourceId) {

@@ -1,22 +1,24 @@
 # 广东公考小程序
 
-聚焦广东公考公告聚合、岗位检索、岗位对比的数据型微信小程序 MVP。
+聚焦广东公考公告聚合、岗位检索、岗位对比的数据型微信小程序 MVP，当前工程已经同时具备：
+
+- 小程序前端主链路
+- 官方来源采集、发布、回退、复核链路
+- 本地 demo / API / DevTools 联调入口
+- 交付检查、分组提交、总包导出与回退工件
 
 ## 目录
 
 - `apps/weapp`：微信小程序前端
 - `services/ingest`：公告与岗位表采集、解析、校验、发布
-- `services/api`：给小程序提供远端数据访问的服务层
+- `services/api`：本地 API 与云函数适配层
 - `packages/shared`：共享模型、规则和测试
-- `docs`：架构与数据源说明
-
-核心文档：
-
-- `docs/product-plan.md`：产品定位、竞品对标、岗位对比与上线边界
-- `docs/architecture.md`：整体架构与数据流
-- `docs/sources.md`：首版数据源与接入边界
+- `docs`：产品、契约、架构、交付文档
+- `output`：demo、smoke、audit、delivery 工件
 
 ## 当前范围
+
+已做：
 
 - 官方公告聚合
 - 结构化岗位列表
@@ -24,7 +26,7 @@
 - 收藏、订阅、浏览记录、站内消息
 - 采集异常告警、复核队列、稳定版本回退
 
-当前前端页面：
+当前页面：
 
 - 首页
 - 公告列表 / 公告详情
@@ -35,128 +37,148 @@
 - 复核中心
 - 我的
 
-当前不做：
+明确不做：
 
 - 题库、课程、模考、直播
 - 经验社区
-- 全国全量来源激进抓取
+- 全国全量激进抓取
+- 黑盒 AI 选岗推荐
 
-## 运行
+## 文档入口
 
-### 共享与采集测试
+先按角色选文档：
 
-```powershell
-node --test packages/shared/test/*.test.js services/ingest/test/*.test.js
-```
+- `docs/role-guide.md`：总入口，先判断你该走哪条链
+- `docs/command-matrix.md`：稳定命令入口，覆盖开发、演示、交付、回退
+- `docs/delivery-checklist.md`：交付检查、runtime/基线边界、基线刷新规则
 
-### 小程序与 API 测试
+再按分线看细节：
 
-```powershell
-node --test apps/weapp/test/*.test.js services/api/test/*.test.js
-```
+- `docs/product-plan.md`：产品定位、竞品对标、上线边界
+- `docs/mvp-contract.md`：总契约
+- `docs/frontend-contract.md`：前端执行基线
+- `docs/ingest-contract.md`：采集/API/发布执行基线
+- `docs/test-matrix.md`：测试与验收基线
+- `docs/architecture.md`：整体架构
+- `docs/sources.md`：首版来源边界
+- `docs/cloud-deploy.md`：云函数部署说明
 
-### 单次采集
+## 最常用命令
 
-```powershell
-node services/ingest/src/index.js
-```
-
-### 定时轮询
-
-```powershell
-$env:INGEST_INTERVAL_MS="300000"
-node services/ingest/src/index.js --watch
-```
-
-### 采集健康报告
+日常回归：
 
 ```powershell
-node scripts/ingest-health-report.js
-node scripts/ingest-health-report.js --source rsks-gd --json
+npm test
+npm run docs:check
+npm run runtime:check
+npm run mvp:smoke
 ```
 
-这个报告会直接读取 `services/ingest/var/`，输出每个来源当前是否适合开放岗位能力、风险标记和下一步处理建议。
-
-### 复核队列处理
+如果本机 PowerShell 执行策略拦截 `npm.ps1`，统一改用：
 
 ```powershell
-node services/ingest/src/index.js --resolve-review review-123 --note "已人工核对"
-node services/ingest/src/index.js --reopen-review review-123
-node services/ingest/src/index.js --resolve-stale-reviews --source-id rsks-gd
+node scripts/run-package-script.js docs:check
+node scripts/run-package-script.js runtime:check
+node scripts/run-package-script.js mvp:smoke
 ```
 
-以上命令会直接更新 `services/ingest/var/` 下的复核记录、告警状态和 `apps/weapp/data/ingested.js` 快照。
+演示与联调：
+
+```powershell
+npm run demo:check
+npm run demo:start
+npm run demo:serve
+npm run demo:status
+npm run weapp:audit
+npm run weapp:smoke
+```
+
+采集与基线：
+
+```powershell
+npm run ingest:health
+npm run baseline:report
+npm run baseline:refresh
+```
+
+交付与总包：
+
+```powershell
+npm run delivery:report
+npm run delivery:check
+npm run delivery:stage
+npm run delivery:plan
+npm run delivery:manifest
+npm run delivery:bundle:write
+```
+
+完整命令说明、推荐顺序和回退入口见 `docs/command-matrix.md`。
+
+## 运行边界
+
+默认本地运行只应写入 runtime 和审计产物，不应直接刷脏提交基线。
+
+提交基线：
+
+- `apps/weapp/data/ingested.js`
+- `services/ingest/var/source-states.json`
+- `services/ingest/var/position-overrides.json`
+- `services/ingest/var/production/**`
+
+本地 runtime / audit：
+
+- `services/ingest/var/runtime/**`
+- `services/api/var/runtime/**`
+- `output/**`
+- `.playwright-cli/**`
+- `apps/weapp/env.runtime.js`
+
+只有在确认要提升当前 runtime 为新的显式基线时，才执行 `npm run baseline:refresh`。这条边界的完整规则见 `docs/delivery-checklist.md`。
+
+## 快速判断
+
+如果你只想知道“现在能不能演示”：
+
+1. `npm run mvp:smoke`
+2. `npm run weapp:audit`
+3. `npm run weapp:smoke`
+4. `npm run docs:check`
+5. `npm run runtime:check`
+6. 看 `output/mvp-smoke/latest.json`、`output/weapp-devtools/latest.json`、`output/docs-entrypoints/latest.json`、`output/runtime-boundaries/latest.json`
+
+如果你只想知道“现在能不能交付”：
+
+1. `npm run delivery:report`
+2. `npm run baseline:report`
+3. `npm run delivery:check`
+4. 如需总包，执行 `npm run delivery:bundle:write`
+
+如果你只想知道“该从哪里看工件”：
+
+- demo：`output/demo-start/**`
+- 主链 smoke：`output/mvp-smoke/**`
+- 包体审计：`output/weapp-bundle/**`
+- DevTools 联调：`output/weapp-devtools/**`
+- 交付总包：`output/delivery-bundle/**`
 
 ## 数据源现状
 
 - `rsks-gd`：已接入真实广东省人事考试网抓取
+- `ggfw-hrss-gd`：已接入广东省人社公共服务入口抓取
 - `national-bm`：当前仍为演示源，前台会明确标记为“演示”
 
-原因是当前环境无法稳定直连 `bm.scs.gov.cn`，因此没有伪装成真实官方接入。
+## 本地运行补充
 
-## 小程序运行
+- 小程序工程目录：`apps/weapp`
+- 默认本地 API：`http://127.0.0.1:3100`
+- 如果 `3100` 被占用，本地 API 会自动回退到可用端口
+- 环境覆写优先级：
+  1. 小程序“我的”页用户保存配置
+  2. `apps/weapp/env.local.js`
+  3. `apps/weapp/env.js`
 
-用微信开发者工具打开 `apps/weapp`。
+更完整的 demo、API、DevTools、云函数说明分别看：
 
-默认走本地 store。也可以在小程序“我的”页里切到远端模式，配置 API 地址并做健康检查。
-
-## 本地 API 服务
-
-启动本地 HTTP 服务：
-
-```powershell
-node services/api/src/index.js
-```
-
-默认监听 `http://127.0.0.1:3100`，并把用户状态持久化到 `services/api/var/user-state.json`。
-
-也可以自定义：
-
-```powershell
-node services/api/src/index.js --port 3200 --snapshot-target C:\\path\\to\\ingested.js --ingest-store-root C:\\path\\to\\services\\ingest\\var
-```
-
-## 云函数友好入口
-
-`services/api` 已拆成三层：
-
-- `services/api/src/core.js`：通用请求处理
-- `services/api/src/index.js`：常驻 Node HTTP 服务
-- `services/api/src/cloud.js`：云函数 / HTTP 网关适配
-
-默认云函数导出在：
-
-- `services/api/src/cloud-function.js`
-
-可对接：
-
-- `GET /health`
-- `POST /rpc`
-
-这两个入口与本地 Node 服务共用同一套用户态持久化、快照加载和复核回写逻辑。
-
-如果云网关会自动在路径前加 stage 或函数前缀，可以给云处理入口传 `routeBasePath`，例如 `/prod/gongkao`，这样 `/prod/gongkao/health` 和 `/prod/gongkao/rpc` 也能正常命中。
-
-具体部署步骤见：
-
+- `docs/command-matrix.md`
+- `docs/delivery-checklist.md`
 - `docs/cloud-deploy.md`
-
-## 小程序环境覆写
-
-默认环境配置在：
-
-- `apps/weapp/env.js`
-
-如果你只想在本机或真机联调时覆盖云网关地址，不想把真实地址提交到仓库，可以新建：
-
-- `apps/weapp/env.local.js`
-
-项目里已经提供示例：
-
-- `apps/weapp/env.local.example.js`
-
-启动时优先级是：
-
-1. 用户在小程序“我的”页保存的连接配置
-2. 本地 `env.local.js`
-3. 仓库默认 `env.js`

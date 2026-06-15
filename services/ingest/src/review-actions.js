@@ -1,4 +1,4 @@
-const path = require("node:path");
+const { ensureLocalRuntimeSeed, localRuntimePaths } = require("../../runtime-paths");
 
 const { FileStore } = require("./storage/file-store");
 const { exportWeappSnapshot } = require("./publish/export-weapp-snapshot");
@@ -25,15 +25,23 @@ function saveReviewAudit(store, event, sourceId, sourceName, now) {
 }
 
 function defaultReviewPaths() {
+  const runtime = localRuntimePaths();
   return {
-    storeRoot: path.resolve(__dirname, "../var"),
-    positionOverridePath: path.resolve(__dirname, "../var/position-overrides.json"),
-    snapshotTarget: path.resolve(__dirname, "../../../apps/weapp/data/ingested.js")
+    storeRoot: runtime.ingestStoreRoot,
+    positionOverridePath: runtime.positionOverridePath,
+    snapshotTarget: runtime.snapshotTarget
   };
 }
 
 async function applyReviewAction(options) {
-  const store = new FileStore(options.storeRoot);
+  const paths = defaultReviewPaths();
+  const storeRoot = options.storeRoot || paths.storeRoot;
+  ensureLocalRuntimeSeed({
+    ingestStoreRoot: storeRoot,
+    snapshotTarget: options.snapshotTarget || paths.snapshotTarget,
+    positionOverridePath: options.positionOverridePath || paths.positionOverridePath
+  });
+  const store = new FileStore(storeRoot);
   const now = options.now || new Date();
   const result = options.action === "resolve"
     ? store.resolveReviewItem(options.reviewId, options.note || "")
@@ -68,7 +76,14 @@ async function applyReviewAction(options) {
 }
 
 async function resolveStaleReviewItems(options) {
-  const store = new FileStore(options.storeRoot);
+  const paths = defaultReviewPaths();
+  const storeRoot = options.storeRoot || paths.storeRoot;
+  ensureLocalRuntimeSeed({
+    ingestStoreRoot: storeRoot,
+    snapshotTarget: options.snapshotTarget || paths.snapshotTarget,
+    positionOverridePath: options.positionOverridePath || paths.positionOverridePath
+  });
+  const store = new FileStore(storeRoot);
   const now = options.now || new Date();
   const sourceId = String(options.sourceId || "").trim();
   const note = options.note || "自动关闭：后续已有稳定成功版本，判定为历史瞬时错误。";

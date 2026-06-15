@@ -41,7 +41,7 @@ function toDegreeRank(value) {
   return 0;
 }
 
-function buildRequirementDeltaReasons(basePosition = {}, candidatePosition = {}) {
+function buildDeltaReasonEntries(basePosition = {}, candidatePosition = {}) {
   const reasons = [];
   const baseEducationRank = toEducationRank(basePosition.education);
   const candidateEducationRank = toEducationRank(candidatePosition.education);
@@ -49,58 +49,82 @@ function buildRequirementDeltaReasons(basePosition = {}, candidatePosition = {})
   const candidateDegreeRank = toDegreeRank(candidatePosition.degree);
 
   if (candidateEducationRank && baseEducationRank && candidateEducationRank < baseEducationRank) {
-    reasons.push("学历门槛更低");
+    reasons.push({ label: "学历门槛更低", tone: "advantage" });
   } else if (candidateEducationRank && baseEducationRank && candidateEducationRank > baseEducationRank) {
-    reasons.push("学历门槛更高");
+    reasons.push({ label: "学历门槛更高", tone: "pressure" });
   }
 
   if (candidateDegreeRank && baseDegreeRank && candidateDegreeRank < baseDegreeRank) {
-    reasons.push("学位门槛更低");
+    reasons.push({ label: "学位门槛更低", tone: "advantage" });
   } else if (candidateDegreeRank && baseDegreeRank && candidateDegreeRank > baseDegreeRank) {
-    reasons.push("学位门槛更高");
+    reasons.push({ label: "学位门槛更高", tone: "pressure" });
   }
 
   if (candidatePosition.serviceRequirement !== basePosition.serviceRequirement) {
     if (isOpenRequirement(candidatePosition.serviceRequirement) && !isOpenRequirement(basePosition.serviceRequirement)) {
-      reasons.push("基层经历限制更少");
+      reasons.push({ label: "基层经历限制更少", tone: "advantage" });
     } else if (!isOpenRequirement(candidatePosition.serviceRequirement) && isOpenRequirement(basePosition.serviceRequirement)) {
-      reasons.push("基层经历要求更严");
+      reasons.push({ label: "基层经历要求更严", tone: "pressure" });
     }
   }
 
   if (Boolean(candidatePosition.freshGraduateOnly) !== Boolean(basePosition.freshGraduateOnly)) {
     if (candidatePosition.freshGraduateOnly) {
-      reasons.push("应届限制更严");
+      reasons.push({ label: "应届限制更严", tone: "pressure" });
     } else {
-      reasons.push("应届限制更少");
+      reasons.push({ label: "应届限制更少", tone: "advantage" });
     }
   }
 
   if (candidatePosition.politicalStatus !== basePosition.politicalStatus) {
     if (isOpenRequirement(candidatePosition.politicalStatus) && !isOpenRequirement(basePosition.politicalStatus)) {
-      reasons.push("政治面貌限制更少");
+      reasons.push({ label: "政治面貌限制更少", tone: "advantage" });
     } else if (!isOpenRequirement(candidatePosition.politicalStatus) && isOpenRequirement(basePosition.politicalStatus)) {
-      reasons.push("政治面貌要求更严");
+      reasons.push({ label: "政治面貌要求更严", tone: "pressure" });
     }
   }
 
   if (Number(candidatePosition.headcount || 0) > Number(basePosition.headcount || 0)) {
-    reasons.push("招录人数更多");
+    reasons.push({ label: "招录人数更多", tone: "advantage" });
   } else if (Number(candidatePosition.headcount || 0) < Number(basePosition.headcount || 0)) {
-    reasons.push("招录人数更少");
+    reasons.push({ label: "招录人数更少", tone: "pressure" });
   }
 
   const baseTrust = basePosition.noticeTrust ? basePosition.noticeTrust.parseQualityStatus : "";
   const candidateTrust = candidatePosition.noticeTrust ? candidatePosition.noticeTrust.parseQualityStatus : "";
   if (baseTrust !== candidateTrust) {
     if (candidateTrust === "healthy" && baseTrust !== "healthy") {
-      reasons.push("结构化可信度更高");
+      reasons.push({ label: "结构化可信度更高", tone: "advantage" });
     } else if (baseTrust === "healthy" && candidateTrust !== "healthy") {
-      reasons.push("结构化可信度更低");
+      reasons.push({ label: "结构化可信度更低", tone: "pressure" });
     }
   }
 
   return reasons.slice(0, 3);
+}
+
+function buildRequirementDeltaReasons(basePosition = {}, candidatePosition = {}) {
+  return buildDeltaReasonEntries(basePosition, candidatePosition).map((item) => item.label);
+}
+
+function buildMatchReasonEntries(candidatePosition = {}) {
+  return (Array.isArray(candidatePosition && candidatePosition.reasons)
+    ? candidatePosition.reasons
+    : []
+  ).slice(0, 3).map((label) => ({
+    label,
+    tone: "match"
+  }));
+}
+
+function buildReviewReasonEntries(candidatePosition = {}) {
+  return (Array.isArray(candidatePosition && candidatePosition.mismatchReasons)
+    ? candidatePosition.mismatchReasons
+    : []
+  ).slice(0, 2).map((label) => ({
+    label,
+    tone: "review"
+  }));
 }
 
 function buildRecommendationProfileHint(basePosition = {}, candidatePosition = {}) {
@@ -126,10 +150,8 @@ function buildRecommendationProfileHint(basePosition = {}, candidatePosition = {
 
 function buildRecommendationReasonSummary(basePosition = {}, candidatePosition = {}) {
   const parts = [];
-  const reasons = Array.isArray(candidatePosition && candidatePosition.reasons)
-    ? candidatePosition.reasons.slice(0, 3)
-    : [];
-  const deltaReasons = buildRequirementDeltaReasons(basePosition, candidatePosition);
+  const reasons = buildMatchReasonEntries(candidatePosition).map((item) => item.label);
+  const deltaReasons = buildDeltaReasonEntries(basePosition, candidatePosition).map((item) => item.label);
   const baseTitle = (basePosition && basePosition.title) || "当前基准岗位";
 
   if (reasons.length) {
@@ -152,18 +174,27 @@ function decorateRecommendedPosition(basePosition = {}, candidatePosition = {}) 
   const nextActionSummary = candidatePosition && candidatePosition.nextAction
     ? `${candidatePosition.nextAction.label} · ${candidatePosition.nextAction.detail}`
     : String((candidatePosition && candidatePosition.nextActionSummary) || "");
+  const matchReasonEntries = buildMatchReasonEntries(candidatePosition);
+  const deltaReasonEntries = buildDeltaReasonEntries(basePosition, candidatePosition);
+  const reviewReasonEntries = buildReviewReasonEntries(candidatePosition);
 
   return {
     ...candidatePosition,
     profileHint: buildRecommendationProfileHint(basePosition, candidatePosition),
     reasonSummary: buildRecommendationReasonSummary(basePosition, candidatePosition),
-    nextActionSummary
+    nextActionSummary,
+    matchReasonEntries,
+    deltaReasonEntries,
+    reviewReasonEntries
   };
 }
 
 module.exports = {
+  buildDeltaReasonEntries,
   buildRequirementDeltaReasons,
+  buildMatchReasonEntries,
   buildRecommendationProfileHint,
   buildRecommendationReasonSummary,
+  buildReviewReasonEntries,
   decorateRecommendedPosition
 };

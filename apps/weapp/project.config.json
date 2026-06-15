@@ -1,13 +1,51 @@
 {
-  "appid": "touristappid",
+  "appid": "wx677f3001dfc00021",
   "projectname": "guangdong-gongkao",
   "compileType": "miniprogram",
   "miniprogramRoot": "./",
-  "cloudfunctionRoot": "../../cloudfunctions",
+  "cloudfunctionRoot": "cloudfunctions/",
   "setting": {
     "urlCheck": false,
     "es6": true,
     "postcss": true,
-    "minified": false
-  }
+    "minified": false,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "enhance": false,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "test"
+      },
+      {
+        "type": "file",
+        "value": "data/ingested.js"
+      },
+      {
+        "type": "file",
+        "value": "project.private.config.json"
+      }
+    ],
+    "include": []
+  },
+  "editorSetting": {}
 }

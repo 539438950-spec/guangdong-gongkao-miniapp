@@ -170,6 +170,7 @@ function mapSourceMode(item, options = {}) {
     ...item,
     lastSuccessfulFetchedAt: item.lastSuccessfulFetchedAt || item.lastFetchedAt || "",
     sourceModeLabel: item.sourceModeLabel || (item.sourceMode === "demo" ? "演示" : "官方"),
+    sourceModeTagClass: item.sourceMode === "demo" ? "tag-warn" : "",
     availabilityLabel: hasStructuredPositions ? "可选岗" : "仅公告",
     availabilityTagClass: hasStructuredPositions ? "" : "tag-warn",
     noticeStageLabel: item.noticeStageLabel || "公告",
@@ -188,6 +189,19 @@ function mapSourceMode(item, options = {}) {
     homePriorityTagClass: homePriority.label === "优先选岗"
       ? "tag-active"
       : (homePriority.label === "进度更新" ? "tag-warn" : "")
+  };
+}
+
+function normalizeHomeSubscription(item = {}) {
+  const newPositionPreview = Array.isArray(item.newPositionPreview) ? item.newPositionPreview : [];
+  const firstNewPositionTitle = newPositionPreview.length && newPositionPreview[0]
+    ? String(newPositionPreview[0].title || "")
+    : "";
+
+  return {
+    ...item,
+    firstNewPositionTitle,
+    compareButtonLabel: item.compareActionLabel || (item.compareReady ? "直接对比新增命中" : "先去调整对比方案")
   };
 }
 
@@ -663,12 +677,15 @@ function enrichHomeSourceState(item, options = {}) {
     publishGate,
     nextAction,
     riskSummary: item.riskSummary || buildSourceRiskSummary(normalized),
-    publishGateTagClass: buildPublishGateTagClass(publishGate)
+    publishGateTagClass: buildPublishGateTagClass(publishGate),
+    runStatusSummary: `${item.lastRunStatus || ""}${item.lastRollback ? " · 已回退到稳定版本" : ""}`
   };
 }
 
 Page({
   data: {
+    pageState: "loading",
+    pageStatusMessage: "",
     heroStats: {
       sourceCount: 0,
       sourceAlertCount: 0,
@@ -727,7 +744,12 @@ Page({
   },
 
   onShow() {
-    api.getDashboard().then((payload) => {
+    this.setData({
+      pageState: "loading",
+      pageStatusMessage: "正在加载首页概览..."
+    });
+
+    return api.getDashboard().then((payload) => {
       const personalProfile = payload.personalProfile || {};
       const focusAreas = this.data.focusAreas || [];
       const reviewQueue = payload.reviewQueue || [];
@@ -742,7 +764,44 @@ Page({
           return Number(right.publishLagMinutes || -1) - Number(left.publishLagMinutes || -1);
         });
 
+      const sourceSummary = payload.sourceSummary || buildSourceSummary(sourceStates, payload.stats || {});
+      const reviewSummary = payload.reviewSummary || buildReviewSummary(
+        reviewQueue,
+        resolvedReviewQueue,
+        payload.stats || {}
+      );
+      const sourceGateFailureTags = (sourceSummary.gateFailureTypeSummary || []).slice(0, 2);
+      const reviewFocusTags = (reviewSummary.failedCheckTypeSummary || []).slice(0, 2);
+      const latestNotices = selectHomeNotices(
+        (payload.notices || []).map((item) => mapSourceMode(item, { personalProfile, focusAreas })),
+        3
+      );
+      const subscriptions = (payload.subscriptions || []).slice(0, 3).map(normalizeHomeSubscription);
+      const compareWorkspace = buildHomeCompareWorkspace(payload.compareGroups || []);
+      const savedFilterWorkspace = buildHomeSavedFilterWorkspace(payload.savedFilters || []);
+      const hasContent = Boolean(
+        latestNotices.length ||
+        subscriptions.length ||
+        sourceStates.length ||
+        compareWorkspace.active ||
+        savedFilterWorkspace.active
+      );
+      const pageState = !hasContent
+        ? "empty"
+        : (
+          Number(sourceSummary.sourceAlertCount || 0) > 0 ||
+          Number(sourceSummary.gateBlockedCount || 0) > 0 ||
+          Number(sourceSummary.rollbackCount || 0) > 0 ||
+          Number(reviewSummary.total || 0) > 0
+        )
+          ? "degraded"
+          : "content";
+
       this.setData({
+        pageState,
+        pageStatusMessage: pageState === "degraded"
+          ? "当前存在来源风险或待复核事项，建议优先处理后再做联调判断。"
+          : (!hasContent ? "当前还没有可展示的首页数据。" : ""),
         heroStats: {
           sourceCount: payload.stats.sourceCount,
           sourceAlertCount: payload.stats.sourceAlertCount,
@@ -754,21 +813,28 @@ Page({
           subscriptionNewHitCount: payload.stats.subscriptionNewHitCount,
           unreadMessageCount: payload.stats.unreadMessageCount
         },
-        latestNotices: selectHomeNotices(
-          (payload.notices || []).map((item) => mapSourceMode(item, { personalProfile, focusAreas })),
-          3
-        ),
-        subscriptions: (payload.subscriptions || []).slice(0, 3),
-        compareWorkspace: buildHomeCompareWorkspace(payload.compareGroups || []),
-        savedFilterWorkspace: buildHomeSavedFilterWorkspace(payload.savedFilters || []),
+        latestNotices,
+        subscriptions,
+        compareWorkspace,
+        savedFilterWorkspace,
         sourceStates,
-        sourceSummary: payload.sourceSummary || buildSourceSummary(sourceStates, payload.stats || {}),
-        reviewSummary: payload.reviewSummary || buildReviewSummary(
-          reviewQueue,
-          resolvedReviewQueue,
-          payload.stats || {}
-        )
+        sourceSummary,
+        reviewSummary,
+        sourceGateFailureTags,
+        reviewFocusTags
       });
+    }).catch((error) => {
+      this.setData({
+        pageState: "error",
+        pageStatusMessage: error && error.message ? error.message : "加载首页概览失败"
+      });
+      if (typeof wx !== "undefined" && wx && typeof wx.showToast === "function") {
+        wx.showToast({
+          title: error && error.message ? error.message : "加载首页概览失败",
+          icon: "none"
+        });
+      }
+      throw error;
     });
   },
 

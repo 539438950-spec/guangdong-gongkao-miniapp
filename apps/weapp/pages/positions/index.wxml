@@ -1,4 +1,25 @@
-<view class="page" wx:if="{{notice}}">
+<view class="page">
+  <view class="card" wx:if="{{pageState === 'loading'}}">
+    <view class="section-title">岗位列表</view>
+    <view class="muted">{{pageStatusMessage || '正在加载岗位与对比方案...'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'error'}}">
+    <view class="section-title">岗位列表</view>
+    <view class="muted">{{pageStatusMessage || '加载岗位列表失败'}}</view>
+  </view>
+
+  <view class="card" wx:elif="{{pageState === 'empty'}}">
+    <view class="section-title">岗位列表</view>
+    <view class="muted">{{pageStatusMessage || '当前公告暂无可展示岗位。'}}</view>
+  </view>
+
+  <block wx:elif="{{pageState === 'content' || pageState === 'degraded'}}">
+  <view class="card" wx:if="{{pageState === 'degraded' && pageStatusMessage}}">
+    <view class="section-title">状态提醒</view>
+    <view class="muted">{{pageStatusMessage}}</view>
+  </view>
+
   <view class="card">
     <view class="section-title">岗位列表</view>
     <view class="muted">{{notice.title}}</view>
@@ -288,4 +309,5 @@
       </view>
     </block>
   </view>
+  </block>
 </view>

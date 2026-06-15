@@ -214,6 +214,9 @@ test("pipeline should publish validated payload", async () => {
   assert.equal(store.listSourceStates()[0].releaseMode, "positions-open");
   assert.equal(store.listSourceStates()[0].fieldCoveragePercent, 71);
   assert.equal(store.listSourceStates()[0].workbookSheetSummary, "职位表:1行/12列");
+  assert.equal(store.listPublishAudits(source.id).length, 1);
+  assert.equal(store.listPublishAudits(source.id)[0].eventType, "publish");
+  assert.equal(store.listPublishAudits(source.id)[0].releaseMode, "positions-open");
 });
 
 test("pipeline should rollback to previous stable payload when validation fails", async () => {
@@ -252,6 +255,10 @@ test("pipeline should rollback to previous stable payload when validation fails"
   assert.equal(store.listSourceStates()[0].releaseMode, "notice-only");
   assert.equal(store.reviewQueue[0].candidateVersionId, store.listSourceStates()[0].candidateVersionId);
   assert.equal(store.reviewQueue[0].rollbackToVersionId, store.listSourceStates()[0].rollbackToVersionId);
+  assert.equal(store.listPublishAudits(source.id).length, 2);
+  assert.equal(store.listPublishAudits(source.id)[0].eventType, "rollback");
+  assert.equal(store.listPublishAudits(source.id)[1].eventType, "publish");
+  assert.equal(store.listPublishAudits(source.id)[0].releaseMode, "notice-only");
 });
 
 test("pipeline should reset consecutive failure count after a later successful run", async () => {

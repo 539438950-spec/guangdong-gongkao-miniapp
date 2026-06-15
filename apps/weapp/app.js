@@ -1,5 +1,24 @@
 const appEnv = require("./env");
 
+function loadOptionalModule(defaultPath) {
+  try {
+    if (typeof process !== "undefined" && process && process.env && process.env.GONGKAO_WEAPP_RUNTIME_ENV_PATH) {
+      return require(process.env.GONGKAO_WEAPP_RUNTIME_ENV_PATH);
+    }
+  } catch (_error) {
+    // Ignore runtime-path override lookup failures and fall back to the default path.
+  }
+
+  try {
+    return require(defaultPath);
+  } catch (_error) {
+    return {};
+  }
+}
+
+let appRuntimeEnv = {};
+appRuntimeEnv = loadOptionalModule("./env.runtime");
+
 let appLocalEnv = {};
 try {
   appLocalEnv = require("./env.local");
@@ -9,6 +28,7 @@ try {
 
 const resolvedEnv = {
   ...appEnv,
+  ...appRuntimeEnv,
   ...appLocalEnv
 };
 

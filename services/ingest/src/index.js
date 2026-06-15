@@ -56,7 +56,7 @@ function getReviewAction() {
 function buildRunOptions() {
   const defaults = defaultPaths();
   return {
-    storeRoot: resolvePathArg("--store-root", defaults.storeRoot),
+    storeRoot: resolvePathArg("--store-root", defaults.storeRoot || defaults.ingestStoreRoot),
     snapshotTarget: resolvePathArg("--snapshot-target", defaults.snapshotTarget),
     positionOverridePath: resolvePathArg("--position-override-path", defaults.positionOverridePath)
   };

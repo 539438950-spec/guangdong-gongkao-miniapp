@@ -75,6 +75,9 @@ test("applyReviewAction should resolve and reopen review items with snapshot exp
   assert.equal(snapshot.resolvedReviewQueue[0].noticeTitle, "广东省2026年考试录用公务员公告");
   assert.equal(snapshot.resolvedReviewQueue[0].fieldCoveragePercent, 71);
   assert.equal(snapshot.alertEvents.length, 0);
+  assert.equal(snapshot.publishAudits.length, 1);
+  assert.equal(snapshot.publishAudits[0].eventType, "review-resolved");
+  assert.equal(snapshot.publishAudits[0].sourceId, "rsks-gd");
 
   const reopened = await applyReviewAction({
     action: "reopen",
@@ -93,6 +96,9 @@ test("applyReviewAction should resolve and reopen review items with snapshot exp
   assert.equal(snapshot.resolvedReviewQueue.length, 0);
   assert.equal(snapshot.alertEvents.length, 1);
   assert.equal(snapshot.alertEvents[0].type, "review-queued");
+  assert.equal(snapshot.publishAudits.length, 2);
+  assert.equal(snapshot.publishAudits[0].eventType, "review-reopened");
+  assert.equal(snapshot.publishAudits[1].eventType, "review-resolved");
 });
 
 test("resolveStaleReviewItems should bulk-resolve historical transient failures", async () => {
@@ -156,4 +162,7 @@ test("resolveStaleReviewItems should bulk-resolve historical transient failures"
   assert.equal(snapshot.resolvedReviewQueue.length, 1);
   assert.equal(snapshot.resolvedReviewQueue[0].id, "review-stale-1");
   assert.equal(snapshot.resolvedReviewQueue[0].resolutionNote, "自动关闭历史复核");
+  assert.equal(snapshot.publishAudits.length, 1);
+  assert.equal(snapshot.publishAudits[0].eventType, "review-stale-resolved");
+  assert.equal(snapshot.publishAudits[0].sourceId, "rsks-gd");
 });

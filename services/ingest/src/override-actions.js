@@ -1,3 +1,4 @@
+const { ensureLocalRuntimeSeed, localRuntimePaths } = require("../../runtime-paths");
 const { FileStore } = require("./storage/file-store");
 const { exportWeappSnapshot } = require("./publish/export-weapp-snapshot");
 const {
@@ -11,10 +12,11 @@ const {
 const { mapSourceState } = require("./publish/source-state");
 
 function defaultOverridePaths() {
+  const runtime = localRuntimePaths();
   return {
-    storeRoot: require("node:path").resolve(__dirname, "../var"),
-    positionOverridePath: defaultPositionOverridePath(),
-    snapshotTarget: require("node:path").resolve(__dirname, "../../..", "apps/weapp/data/ingested.js")
+    storeRoot: runtime.ingestStoreRoot,
+    positionOverridePath: runtime.positionOverridePath || defaultPositionOverridePath(),
+    snapshotTarget: runtime.snapshotTarget
   };
 }
 
@@ -44,6 +46,11 @@ function validatePositionOverrideRule(input = {}) {
 
 function rebuildSnapshotWithOverrides(options = {}) {
   const paths = defaultOverridePaths();
+  ensureLocalRuntimeSeed({
+    ingestStoreRoot: paths.storeRoot,
+    snapshotTarget: paths.snapshotTarget,
+    positionOverridePath: paths.positionOverridePath
+  });
   const storeRoot = options.storeRoot || paths.storeRoot;
   const positionOverridePath = options.positionOverridePath || paths.positionOverridePath;
   const snapshotTarget = options.snapshotTarget || paths.snapshotTarget;

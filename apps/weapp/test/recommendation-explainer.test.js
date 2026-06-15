@@ -45,6 +45,10 @@ test("recommendation explainer should describe stricter candidate requirements c
   assert.ok(result.reasonSummary.includes("和基准相比"));
   assert.ok(result.reasonSummary.includes("待确认"));
   assert.equal(result.nextActionSummary, "先核对报考条件 · 重点确认学历和政治面貌要求");
+  assert.equal(result.matchReasonEntries[0].label, "学历一致");
+  assert.equal(result.deltaReasonEntries[0].label, "学历门槛更高");
+  assert.equal(result.deltaReasonEntries[0].tone, "pressure");
+  assert.equal(result.reviewReasonEntries[0].label, "学历要求不匹配");
 });
 
 test("recommendation explainer should describe friendlier candidates clearly", () => {
@@ -82,4 +86,7 @@ test("recommendation explainer should describe friendlier candidates clearly", (
   assert.equal(result.profileHint, "对你更友好：少 2 项待确认");
   assert.ok(result.reasonSummary.includes("和执法岗相似"));
   assert.ok(result.reasonSummary.includes("和基准相比"));
+  assert.equal(result.matchReasonEntries[0].label, "专业重合");
+  assert.equal(result.deltaReasonEntries[0].label, "学历门槛更低");
+  assert.equal(result.deltaReasonEntries[0].tone, "advantage");
 });
